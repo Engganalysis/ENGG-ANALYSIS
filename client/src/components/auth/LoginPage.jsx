@@ -31,6 +31,15 @@ const LoginPage = () => {
             ]
         },
         {
+            image: "/Blog-Image.jpg",
+            quote: "KNOWLEDGE IS POWER, AND QUALITY EDUCATION IS THE KEY TO UNLOCKING IT",
+            animClass: "anim-fade",
+            stats: [
+                { icon: <TrendingUp size={20} />, label: "ACADEMIC EXCELLENCE", value: "YEAR ON YEAR" },
+                { icon: <Award size={20} />, label: "NATIONWIDE SUCCESS", value: "TOP RANKS" }
+            ]
+        },
+        {
             image: "/vitaly-gariev-GtsYSWLmqP0-unsplash.jpg",
             quote: "ENGINEERING IS THE ART OF ORGANIZING NATURE FOR THE BENEFIT OF HUMANITY",
             animClass: "anim-zoom",
