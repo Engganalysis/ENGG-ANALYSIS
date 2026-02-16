@@ -393,41 +393,33 @@ app.get('/api/studentsByCampus', async (req, res) => {
 app.get('/api/exam-stats', async (req, res) => {
     try {
         const pool = await connectToDb();
-        let where = buildWhereClause(req);
-        // Filter out empty/invalid metadata rows
-        const isValid = "Test IS NOT NULL AND Test != '' AND DATE IS NOT NULL AND DATE != ''";
-        if (where) {
-            where += ` AND ${isValid}`;
-        } else {
-            where = `WHERE ${isValid}`;
-        }
-
+        const where = buildWhereClause(req);
         const query = `
             SELECT 
-                DATE,
-                Test, 
+                DATE(DATE) as DATE,
+                TRIM(Test) as Test, 
                 COUNT(STUD_ID) as Attn,
-                MAX(CAST(Total AS FLOAT)) as Max_T,
-                SUM(CASE WHEN CAST(Total AS FLOAT) >= 250 THEN 1 ELSE 0 END) as T_250,
-                SUM(CASE WHEN CAST(Total AS FLOAT) >= 200 THEN 1 ELSE 0 END) as T_200,
-                SUM(CASE WHEN CAST(Total AS FLOAT) >= 180 THEN 1 ELSE 0 END) as T_180,
-                SUM(CASE WHEN CAST(Total AS FLOAT) >= 150 THEN 1 ELSE 0 END) as T_150,
-                SUM(CASE WHEN CAST(Total AS FLOAT) >= 120 THEN 1 ELSE 0 END) as T_120,
-                SUM(CASE WHEN CAST(Total AS FLOAT) >= 100 THEN 1 ELSE 0 END) as T_100,
-                SUM(CASE WHEN CAST(Total AS FLOAT) >= 80 THEN 1 ELSE 0 END) as T_80,
-                MAX(CAST(MAT AS FLOAT)) as Max_M,
-                SUM(CASE WHEN CAST(MAT AS FLOAT) >= 80 THEN 1 ELSE 0 END) as M_80,
-                SUM(CASE WHEN CAST(MAT AS FLOAT) >= 70 THEN 1 ELSE 0 END) as M_70,
-                MAX(CAST(PHY AS FLOAT)) as Max_P,
-                SUM(CASE WHEN CAST(PHY AS FLOAT) >= 80 THEN 1 ELSE 0 END) as P_80,
-                SUM(CASE WHEN CAST(PHY AS FLOAT) >= 70 THEN 1 ELSE 0 END) as P_70,
-                MAX(CAST(CHE AS FLOAT)) as Max_C,
-                SUM(CASE WHEN CAST(CHE AS FLOAT) >= 80 THEN 1 ELSE 0 END) as C_80,
-                SUM(CASE WHEN CAST(CHE AS FLOAT) >= 70 THEN 1 ELSE 0 END) as C_70
+                MAX(CAST(Total AS DECIMAL(10,2))) as Max_T,
+                SUM(CASE WHEN CAST(Total AS DECIMAL(10,2)) >= 250 THEN 1 ELSE 0 END) as T_250,
+                SUM(CASE WHEN CAST(Total AS DECIMAL(10,2)) >= 200 THEN 1 ELSE 0 END) as T_200,
+                SUM(CASE WHEN CAST(Total AS DECIMAL(10,2)) >= 180 THEN 1 ELSE 0 END) as T_180,
+                SUM(CASE WHEN CAST(Total AS DECIMAL(10,2)) >= 150 THEN 1 ELSE 0 END) as T_150,
+                SUM(CASE WHEN CAST(Total AS DECIMAL(10,2)) >= 120 THEN 1 ELSE 0 END) as T_120,
+                SUM(CASE WHEN CAST(Total AS DECIMAL(10,2)) >= 100 THEN 1 ELSE 0 END) as T_100,
+                SUM(CASE WHEN CAST(Total AS DECIMAL(10,2)) >= 80 THEN 1 ELSE 0 END) as T_80,
+                MAX(CAST(MAT AS DECIMAL(10,2))) as Max_M,
+                SUM(CASE WHEN CAST(MAT AS DECIMAL(10,2)) >= 80 THEN 1 ELSE 0 END) as M_80,
+                SUM(CASE WHEN CAST(MAT AS DECIMAL(10,2)) >= 70 THEN 1 ELSE 0 END) as M_70,
+                MAX(CAST(PHY AS DECIMAL(10,2))) as Max_P,
+                SUM(CASE WHEN CAST(PHY AS DECIMAL(10,2)) >= 80 THEN 1 ELSE 0 END) as P_80,
+                SUM(CASE WHEN CAST(PHY AS DECIMAL(10,2)) >= 70 THEN 1 ELSE 0 END) as P_70,
+                MAX(CAST(CHE AS DECIMAL(10,2))) as Max_C,
+                SUM(CASE WHEN CAST(CHE AS DECIMAL(10,2)) >= 80 THEN 1 ELSE 0 END) as C_80,
+                SUM(CASE WHEN CAST(CHE AS DECIMAL(10,2)) >= 70 THEN 1 ELSE 0 END) as C_70
             FROM ENGG_RESULT
             ${where}
-            GROUP BY Test, DATE
-            ORDER BY STR_TO_DATE(DATE, '%Y-%m-%d') DESC
+            GROUP BY TRIM(Test), DATE(DATE)
+            ORDER BY DATE DESC, Test ASC
         `;
 
         logQuery(query, req.query);
@@ -451,14 +443,14 @@ app.get('/api/analysis-report', async (req, res) => {
                 STUD_ID,
                 MAX(NAME_OF_THE_STUDENT) as name,
                 MAX(CAMPUS_NAME) as campus,
-                AVG(CAST(Total as FLOAT)) as tot,
-                AVG(CAST(AIR as FLOAT)) as air,
-                AVG(CAST(MAT as FLOAT)) as mat,
-                AVG(CAST(M_Rank as FLOAT)) as m_rank,
-                AVG(CAST(PHY as FLOAT)) as phy,
-                AVG(CAST(P_Rank as FLOAT)) as p_rank,
-                AVG(CAST(CHE as FLOAT)) as che,
-                AVG(CAST(C_Rank as FLOAT)) as c_rank,
+                AVG(CAST(Total as DECIMAL(10,2))) as tot,
+                AVG(CAST(AIR as DECIMAL(10,2))) as air,
+                AVG(CAST(MAT as DECIMAL(10,2))) as mat,
+                AVG(CAST(M_Rank as DECIMAL(10,2))) as m_rank,
+                AVG(CAST(PHY as DECIMAL(10,2))) as phy,
+                AVG(CAST(P_Rank as DECIMAL(10,2))) as p_rank,
+                AVG(CAST(CHE as DECIMAL(10,2))) as che,
+                AVG(CAST(C_Rank as DECIMAL(10,2))) as c_rank,
                 COUNT(Test) as t_app
             FROM ENGG_RESULT
             ${where}
@@ -468,10 +460,10 @@ app.get('/api/analysis-report', async (req, res) => {
 
         // 2. Get Metadata (Test Names, Dates, Total Count)
         const metaQuery = `
-            SELECT DISTINCT Test, DATE 
+            SELECT DISTINCT Test, DATE(DATE) as DATE 
             FROM ENGG_RESULT
             ${where}
-            ORDER BY STR_TO_DATE(DATE, '%Y-%m-%d') ASC
+            ORDER BY DATE ASC
         `;
 
         logQuery(studentQuery, req.query);

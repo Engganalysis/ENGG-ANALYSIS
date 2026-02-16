@@ -231,8 +231,7 @@ const AnalysisReport = ({ filters }) => {
                 }
             };
 
-            const [bgImg, logoImg, impactFont] = await Promise.all([
-                loadImage('/college-bg.png'),
+            const [logoImg, impactFont] = await Promise.all([
                 loadImage('/logo.png'),
                 loadFont('/fonts/unicode.impact.ttf')
             ]);
@@ -244,78 +243,66 @@ const AnalysisReport = ({ filters }) => {
             }
 
             const pageWidth = doc.internal.pageSize.getWidth();
-            let currentY = 10; // Top Margin Reduced to move up
 
-            // --- HEADER LAYOUT: VERTICAL STACK (Logo -> Title -> Subtitle) ---
+            // 1. Draw Header Background (Pastel Plain)
+            const headerHeight = 62;
+            doc.setFillColor(240, 249, 255); // Light Pastel Blue (#F0F9FF)
+            doc.rect(0, 0, pageWidth, headerHeight, 'F');
 
-            // Logo Dimensions
-            const logoH = 23; // Reduced size
-            let logoW = 23;
+            // Subtle bottom border for the header
+            doc.setDrawColor(200, 220, 240);
+            doc.setLineWidth(0.2);
+            doc.line(0, headerHeight, pageWidth, headerHeight);
+
+            let currentY = 10;
+
+            // --- HEADER LAYOUT ---
+            const logoH = 22;
+            let logoW = 22;
             if (logoImg) {
                 const aspect = logoImg.width / logoImg.height;
                 logoW = logoH * aspect;
-            }
-
-            // 1. Draw Logo (Centered)
-            if (logoImg) {
                 const logoX = (pageWidth - logoW) / 2;
                 doc.addImage(logoImg, 'PNG', logoX, currentY, logoW, logoH, undefined, 'FAST');
-                currentY += logoH + 2; // Reduced gap below logo
-            } else {
-                currentY += 10;
+                currentY += logoH + 2;
             }
 
-            // Title Configuration
             const part1 = "Sri Chaitanya";
             const part2 = " Educational Institutions";
-            doc.setFontSize(35); // Reduced from 36
+            doc.setFontSize(34);
 
-            // Calculate Widths
-            // Part 1: Impact (User provided font)
-            // Fallback to helvetica bold if font didn't load
-            if (impactFont) {
-                doc.setFont("Impact", "normal");
-            } else {
-                doc.setFont("helvetica", "bold");
-            }
+            if (impactFont) doc.setFont("Impact", "normal");
+            else doc.setFont("helvetica", "bold");
             const w1 = doc.getTextWidth(part1);
 
-            // Part 2: Helvetica
             doc.setFont("helvetica", "normal");
             const w2 = doc.getTextWidth(part2);
 
-            // Total centering width
             const totalTitleWidth = w1 + w2;
             const titleStartX = (pageWidth - totalTitleWidth) / 2;
 
-            // 2. Draw Title Text (Part 1 - "Sri Chaitanya")
-            if (impactFont) {
-                doc.setFont("Impact", "normal");
-            } else {
-                doc.setFont("helvetica", "bold");
-            }
-            doc.setTextColor(0, 112, 192); // #0070C0
+            if (impactFont) doc.setFont("Impact", "normal");
+            else doc.setFont("helvetica", "bold");
+            doc.setTextColor(0, 80, 160); // Darker blue for contrast
             doc.text(part1, titleStartX, currentY + 10);
 
-            // 3. Draw Title Text (Part 2 - "Educational Institutions") - Normal Style
             doc.setFont("helvetica", "normal");
-            doc.setTextColor(0, 102, 204); // #0066CC
+            doc.setTextColor(20, 60, 120);
             doc.text(part2, titleStartX + w1, currentY + 10);
 
-            currentY += 20; // Increased gap below title for better separation
+            currentY += 22;
 
-            // 4. Custom Subtitle Pattern
             const testDate = examStats.length > 0 ? formatDate(examStats[0].DATE) : formatDate(new Date());
             const stream = (filters.stream && filters.stream.length > 0) ? filters.stream.join(',') : 'SR_ELITE';
             const testName = examStats.length > 0 ? examStats[0].Test : 'GRAND TEST';
             const fullPattern = `${testDate}_${stream}_${testName}_All India Marks Analysis`.replace(/\//g, '-');
 
             doc.setFont("helvetica", "bolditalic");
-            doc.setFontSize(18); // Increased to 18
-            doc.setTextColor(128, 0, 64); // Maroon
+            doc.setFontSize(16);
+            doc.setTextColor(110, 0, 50); // Deep Maroon
             doc.text(fullPattern, pageWidth / 2, currentY, { align: 'center', maxWidth: pageWidth - 20 });
 
-            currentY += 8; // Reduced gap before table
+            currentY += 10;
 
             // 4. Data Tables
             const tableColumn = [
@@ -392,6 +379,9 @@ const AnalysisReport = ({ filters }) => {
                 margin: { left: 9, right: 9, top: 15, bottom: 15 },
                 tableWidth: 'auto', // Let it take full width between margins
                 rowPageBreak: 'avoid', // Prevent rows from splitting across pages (Corrected placement)
+                didDrawPage: (data) => {
+                    // Page watermark removed for pastel plain design
+                },
                 didParseCell: (data) => {
                     // Reduce font size for first 3 columns to 10pt as requested
                     if (data.section === 'body' && (data.column.index === 0 || data.column.index === 1 || data.column.index === 2)) {

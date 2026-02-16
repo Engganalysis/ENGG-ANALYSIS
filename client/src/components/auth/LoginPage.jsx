@@ -22,8 +22,8 @@ const LoginPage = () => {
 
     const slides = [
         {
-            image: "/brooke-cagle-g1Kr4Ozfoac-unsplash.jpg",
-            quote: "TRANSFORMING DREAMS INTO REALITY THROUGH EXCELLENCE",
+            image: "/antoine-dautry-05A-kdOH6Hw-unsplash.jpg",
+            quote: "THE ROAD TO SUCCESS IN JEE STARTS WITH CONSISTENT PRACTICE AND CONCEPTUAL CLARITY",
             animClass: "anim-fade",
             stats: [
                 { icon: <Users size={20} />, label: "JEE QUALIFIED", value: "85,000+" },
@@ -31,8 +31,8 @@ const LoginPage = () => {
             ]
         },
         {
-            image: "/pang-yuhao-_kd5cxwZOK4-unsplash.jpg",
-            quote: "GLOBAL STANDARDS IN ENGINEERING EDUCATION",
+            image: "/vitaly-gariev-GtsYSWLmqP0-unsplash.jpg",
+            quote: "ENGINEERING IS THE ART OF ORGANIZING NATURE FOR THE BENEFIT OF HUMANITY",
             animClass: "anim-zoom",
             stats: [
                 { icon: <School size={20} />, label: "LEGACY OF TRUST", value: "38 YEARS" },
@@ -40,8 +40,8 @@ const LoginPage = () => {
             ]
         },
         {
-            image: "/david-schultz-kM97y3aWWQw-unsplash.jpg",
-            quote: "WHERE DETERMINATION MEETS WORLD-CLASS MENTORSHIP",
+            image: "/aaron-lefler-Vs6ip7fsld8-unsplash.jpg",
+            quote: "RANK IS THE REFLECTION OF YOUR DEDICATION TO MASTERING SCIENCE AND MATHEMATICS",
             animClass: "anim-slide",
             stats: [
                 { icon: <Users size={20} />, label: "ASPIRING ENGINEERS", value: "2 LAC PROJECTED" },

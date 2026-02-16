@@ -75,7 +75,7 @@ body {
     color: var(--text-primary);
     background-image:
         linear-gradient(rgba(240, 249, 255, 0.94), rgba(240, 249, 255, 0.94)),
-        url('https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=1920&q=80');
+        url('/college-bg.png');
     background-size: cover;
     background-position: center;
     background-attachment: fixed;
