@@ -444,11 +444,11 @@ const AverageReport = ({ filters }) => {
                                         <tr className="table-main-header">
                                             <th className="w-test">Test Name</th>
                                             <th className="w-date">Date</th>
-                                            <th className="w-total col-yellow">Total<br />300</th>
+                                            <th className="w-total col-yellow">TOT<br />300</th>
                                             <th className="w-air">AIR</th>
-                                            <th className="w-sub col-orange">Mat<br />100</th>
-                                            <th className="w-sub col-green-pale">Phy<br />100</th>
-                                            <th className="w-sub col-pink-pale">Chem<br />100</th>
+                                            <th className="w-sub col-orange">MAT<br />100</th>
+                                            <th className="w-sub col-green-pale">PHY<br />100</th>
+                                            <th className="w-sub col-pink-pale">CHE<br />100</th>
                                         </tr>
                                     </thead>
                                     <tbody>

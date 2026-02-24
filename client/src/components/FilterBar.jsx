@@ -401,8 +401,8 @@ const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} })
                     />
                 </div>
 
-                {/* Stream Select (Engineering calls it Batch) */}
-                <div className={`filter-group ${loadingFilters || (!isRestricted && filters.campus.length === 0) ? 'disabled-logic' : ''}`}>
+                {/* Batch Select */}
+                <div className={`filter-group ${loadingFilters || (filters.campus.length === 0 && !isRestricted) ? 'disabled-logic' : ''}`}>
                     <label>Batch</label>
                     <Select
                         isMulti
@@ -415,23 +415,23 @@ const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} })
                         classNamePrefix="react-select"
                         placeholder="Select Batch..."
                         styles={customStyles}
-                        isDisabled={loadingFilters || (!isRestricted && filters.campus.length === 0)}
+                        isDisabled={loadingFilters || (filters.campus.length === 0 && !isRestricted)}
                     />
                 </div>
 
-                {/* Test Type Select (Engineering calls it P1/P2) */}
+                {/* Test_Type Select */}
                 <div className={`filter-group ${loadingFilters || filters.stream.length === 0 ? 'disabled-logic' : ''}`}>
-                    <label>P1/P2</label>
+                    <label>Test_Type</label>
                     <Select
                         isMulti
                         name="testType"
-                        options={withSelectAll(options.testTypes, "P1/P2")}
+                        options={withSelectAll(options.testTypes, "Test_Type")}
                         value={getValue('testType')}
                         onChange={(opts, meta) => handleSelectChange('testType', opts, meta)}
                         className="react-select-container"
                         isLoading={loadingFilters}
                         classNamePrefix="react-select"
-                        placeholder="Select P1/P2..."
+                        placeholder="Select Test_Type..."
                         styles={customStyles}
                         isDisabled={loadingFilters || filters.stream.length === 0}
                     />
@@ -455,26 +455,26 @@ const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} })
                     />
                 </div>
 
-                {/* Top_ALL Select (Engineering calls it Top_AIR) */}
+                {/* Top_ALL Select */}
                 <div className={`filter-group ${loadingFilters || filters.test.length === 0 ? 'disabled-logic' : ''}`}>
-                    <label>Top_AIR</label>
+                    <label>Top_ALL</label>
                     <Select
                         isMulti
                         name="topAll"
-                        options={withSelectAll(options.topAll || [], "Top_AIR")}
+                        options={withSelectAll(options.topAll || [], "Top_ALL")}
                         value={getValue('topAll')}
                         onChange={(opts, meta) => handleSelectChange('topAll', opts, meta)}
                         className="react-select-container"
                         isLoading={loadingFilters}
                         classNamePrefix="react-select"
-                        placeholder="Select Top_AIR..."
+                        placeholder="Select Top_ALL..."
                         styles={customStyles}
                         isDisabled={loadingFilters || filters.test.length === 0}
                     />
                 </div>
 
                 {/* Student Name Select */}
-                <div className={`filter-group wide-filter ${loadingStudents || filters.topAll.length === 0 ? 'disabled-logic' : ''}`}>
+                <div className={`filter-group wide-filter ${loadingStudents || filters.test.length === 0 ? 'disabled-logic' : ''}`}>
                     <label>Student Name</label>
                     <Select
                         isMulti

@@ -371,7 +371,7 @@ app.get('/api/studentsByCampus', async (req, res) => {
                 TRIM(STUD_ID) as id, 
                 MAX(TRIM(NAME_OF_THE_STUDENT)) as name,
                 MAX(TRIM(CAMPUS_NAME)) as campus,
-                MAX(TRIM(Stream)) as stream
+                MAX(TRIM(Batch)) as stream
             FROM ENGG_RESULT 
             ${where} 
             GROUP BY STUD_ID
@@ -507,14 +507,14 @@ app.get('/api/erp/filters', async (req, res) => {
 
         // Note: Frontend sends 'branch' (mapped to campus filter), we query 'Branch' column
         const branchClause = buildOptionClause('UPPER(TRIM(Branch))', branch);
-        const streamClause = buildOptionClause('UPPER(TRIM(Stream))', stream);
+        const streamClause = buildOptionClause('UPPER(TRIM(Batch))', stream);
         const testTypeClause = buildOptionClause('UPPER(TRIM(Test_Type))', testType);
         const testClause = buildOptionClause('UPPER(TRIM(Test))', test);
 
         const branchesQuery = 'SELECT DISTINCT TRIM(Branch) as Result FROM ERP_REPORT_ENGG WHERE Branch IS NOT NULL AND Branch != \'\' ORDER BY Result';
 
         const sWhere = branchClause ? `WHERE ${branchClause}` : 'WHERE 1=1';
-        const streamsQuery = `SELECT DISTINCT TRIM(Stream) as Result FROM ERP_REPORT_ENGG ${sWhere} AND Stream IS NOT NULL AND Stream != '' ORDER BY Result`;
+        const streamsQuery = `SELECT DISTINCT TRIM(Batch) as Result FROM ERP_REPORT_ENGG ${sWhere} AND Batch IS NOT NULL AND Batch != '' ORDER BY Result`;
 
         let ttClauses = [];
         if (branchClause) ttClauses.push(branchClause);
@@ -570,7 +570,7 @@ app.get('/api/erp/report', async (req, res) => {
 
         // Map filters to ERP columns
         addClause('Branch', campus);
-        addClause('Stream', stream);
+        addClause('Batch', stream);
         addClause('Test', test);
         addClause('Test_Type', testType);
         addClause('Top_ALL', topAll);
@@ -727,7 +727,7 @@ app.get('/api/erp/students', async (req, res) => {
 
         // Apply Filters
         addClause('Branch', campus);
-        addClause('Stream', stream);
+        addClause('Batch', stream);
         addClause('Test', test);
         addClause('Test_Type', testType);
 
@@ -749,7 +749,7 @@ app.get('/api/erp/students', async (req, res) => {
                 TRIM(STUD_ID) as id, 
                 MAX(TRIM(Student_Name)) as name,
                 MAX(TRIM(Branch)) as campus,
-                MAX(TRIM(Stream)) as stream
+                MAX(TRIM(Batch)) as stream
             FROM ERP_REPORT_ENGG 
             ${whereClause} 
             GROUP BY STUD_ID

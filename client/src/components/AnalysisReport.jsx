@@ -675,13 +675,13 @@ const AnalysisReport = ({ filters }) => {
                                         <th className="w-id-col" onClick={() => requestSort(setMeritSortConfig, 'STUD_ID')}>ID <SortIcon config={meritSortConfig} columnKey="STUD_ID" /></th>
                                         <th className="w-name-col" onClick={() => requestSort(setMeritSortConfig, 'name')}>Name <SortIcon config={meritSortConfig} columnKey="name" /></th>
                                         <th className="w-campus-col" onClick={() => requestSort(setMeritSortConfig, 'campus')}>Campus <SortIcon config={meritSortConfig} columnKey="campus" /></th>
-                                        <th className="col-yellow w-marks-col" onClick={() => requestSort(setMeritSortConfig, 'tot')}>TOTAL <SortIcon config={meritSortConfig} columnKey="tot" /></th>
+                                        <th className="col-yellow w-marks-col" onClick={() => requestSort(setMeritSortConfig, 'tot')}>TOT<br />300 <SortIcon config={meritSortConfig} columnKey="tot" /></th>
                                         <th className="col-yellow w-marks-col" onClick={() => requestSort(setMeritSortConfig, 'air')}>AIR <SortIcon config={meritSortConfig} columnKey="air" /></th>
-                                        <th className="col-green w-marks-col" onClick={() => requestSort(setMeritSortConfig, 'mat')}>MAT <SortIcon config={meritSortConfig} columnKey="mat" /></th>
+                                        <th className="col-green w-marks-col" onClick={() => requestSort(setMeritSortConfig, 'mat')}>MAT<br />100 <SortIcon config={meritSortConfig} columnKey="mat" /></th>
                                         <th className="col-green w-marks-col" onClick={() => requestSort(setMeritSortConfig, 'm_rank')}>RANK <SortIcon config={meritSortConfig} columnKey="m_rank" /></th>
-                                        <th className="col-green-pale w-marks-col" onClick={() => requestSort(setMeritSortConfig, 'phy')}>PHYSICS <SortIcon config={meritSortConfig} columnKey="phy" /></th>
+                                        <th className="col-green-pale w-marks-col" onClick={() => requestSort(setMeritSortConfig, 'phy')}>PHY<br />100 <SortIcon config={meritSortConfig} columnKey="phy" /></th>
                                         <th className="col-green-pale w-marks-col" onClick={() => requestSort(setMeritSortConfig, 'p_rank')}>RANK <SortIcon config={meritSortConfig} columnKey="p_rank" /></th>
-                                        <th className="col-pink-pale w-marks-col" onClick={() => requestSort(setMeritSortConfig, 'che')}>CHEMISTRY <SortIcon config={meritSortConfig} columnKey="che" /></th>
+                                        <th className="col-pink-pale w-marks-col" onClick={() => requestSort(setMeritSortConfig, 'che')}>CHE<br />100 <SortIcon config={meritSortConfig} columnKey="che" /></th>
                                         <th className="col-pink-pale w-marks-col" onClick={() => requestSort(setMeritSortConfig, 'c_rank')}>RANK <SortIcon config={meritSortConfig} columnKey="c_rank" /></th>
                                         <th className="col-exams w-marks-col" onClick={() => requestSort(setMeritSortConfig, 't_app')}>EXAMS <SortIcon config={meritSortConfig} columnKey="t_app" /></th>
                                     </tr>

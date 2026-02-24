@@ -29,6 +29,7 @@ const ErrorReport = ({ filters, setFilters }) => {
     const [loading, setLoading] = useState(false);
     const [generatingPdf, setGeneratingPdf] = useState(false);
     const [pdfProgress, setPdfProgress] = useState('');
+    const [zoom, setZoom] = useState(1);
     const reportRef = useRef(null);
 
     // Subject Options
@@ -439,7 +440,11 @@ const ErrorReport = ({ filters, setFilters }) => {
                 let percVal = "";
                 if (percRaw !== undefined && percRaw !== null && percRaw !== '') {
                     const num = parseFloat(percRaw);
-                    if (!isNaN(num)) percVal = Math.round(num * 100) + "%";
+                    if (!isNaN(num)) {
+                        // If it contains '%' OR it's a high number > 1, treat as already being a percentage
+                        const isAlreadyPercent = String(percRaw).includes('%') || num > 1.0;
+                        percVal = isAlreadyPercent ? Math.round(num) + "%" : Math.round(num * 100) + "%";
+                    }
                 }
 
                 // Details Height: Stacked 2 lines minimum
@@ -676,6 +681,14 @@ const ErrorReport = ({ filters, setFilters }) => {
                         </div>
                     )}
 
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', backgroundColor: '#f8f9fa', padding: '5px 10px', borderRadius: '4px', border: '1px solid #dee2e6' }}>
+                        <span style={{ fontWeight: 'bold', fontSize: '13px', marginRight: '5px' }}>Zoom:</span>
+                        <button onClick={() => setZoom(prev => Math.max(prev - 0.1, 0.5))} style={{ padding: '2px 8px', cursor: 'pointer' }}>-</button>
+                        <span style={{ minWidth: '45px', textAlign: 'center', fontWeight: 'bold' }}>{Math.round(zoom * 100)}%</span>
+                        <button onClick={() => setZoom(prev => Math.min(prev + 0.1, 2))} style={{ padding: '2px 8px', cursor: 'pointer' }}>+</button>
+                        <button onClick={() => setZoom(1)} style={{ padding: '2px 8px', cursor: 'pointer', marginLeft: '5px', fontSize: '12px' }}>Reset</button>
+                    </div>
+
                     {/* View Report Button */}
                     <button
                         onClick={handleViewReport}
@@ -731,7 +744,18 @@ const ErrorReport = ({ filters, setFilters }) => {
                 // Filter questions for rendering
 
                 return (
-                    <div key={sIdx} style={{ width: '210mm', minHeight: '297mm', margin: '0 auto 40px auto', backgroundColor: 'white', padding: '10mm', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', boxSizing: 'border-box' }}>
+                    <div key={sIdx} style={{
+                        width: '210mm',
+                        minHeight: '297mm',
+                        margin: '0 auto 40px auto',
+                        backgroundColor: 'white',
+                        padding: '10mm',
+                        boxShadow: '0 4px 10px rgba(0,0,0,0.2)',
+                        boxSizing: 'border-box',
+                        transform: `scale(${zoom})`,
+                        transformOrigin: 'top center',
+                        marginBottom: `${(zoom - 1) * 287 + 20}mm` // Correctly pushes next page down
+                    }}>
 
                         {/* Header */}
                         <div style={{ textAlign: 'center', marginBottom: '15px' }}>

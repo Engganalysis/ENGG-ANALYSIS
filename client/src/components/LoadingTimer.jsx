@@ -17,27 +17,26 @@ const LoadingTimer = ({ isLoading }) => {
 
         if (isLoading) {
             setSeconds(0);
-            // Don't show immediately. Wait for 3 seconds of "loading" state.
+            // Don't show immediately. Wait for 5 seconds of "loading" state.
             // This prevents the popup from flickering on fast refreshes or navigations.
             delayTimer = setTimeout(() => {
                 setShowTimer(true);
-            }, 3000);
-
-            // Start counting immediately in background so if it DOES show,
-            // the time reflects the true wait time.
-            interval = setInterval(() => {
-                setSeconds(prev => prev + 1);
-            }, 1000);
+                // Start counting only after the delay
+                interval = setInterval(() => {
+                    setSeconds(prev => prev + 1);
+                }, 1000);
+            }, 5000);
         } else {
             // Loading finished
             setSeconds(0);
             setShowTimer(false);
-            clearTimeout(delayTimer);
+            if (delayTimer) clearTimeout(delayTimer);
+            if (interval) clearInterval(interval);
         }
 
         return () => {
-            clearInterval(interval);
-            clearTimeout(delayTimer);
+            if (interval) clearInterval(interval);
+            if (delayTimer) clearTimeout(delayTimer);
         };
     }, [isLoading]);
 
