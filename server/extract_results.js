@@ -5,11 +5,15 @@ const fs = require('fs');
 
 const CONFIG_PATH = path.join(__dirname, '..', 'Uploader_Config.xlsx');
 const RESULT_DIR = path.join(__dirname, '..', 'Result');
+const LOG_PATH = path.join(__dirname, '..', 'Missing_Columns_Log.txt');
 
 async function run() {
     try {
         const pool = await connectToDb();
         console.log("Connected to TiDB.");
+
+        // Clear or initialize log file
+        fs.writeFileSync(LOG_PATH, `=== UPLOADER LOG: ${new Date().toLocaleString()} ===\n\n`);
 
         // 1. Load Config
         if (!fs.existsSync(CONFIG_PATH)) {
@@ -44,11 +48,13 @@ async function run() {
         const files = findResultFiles(RESULT_DIR);
         console.log(`Found ${files.length} result files to process.`);
 
+        const processedGroups = new Set();
         for (const file of files) {
             console.log(`\nProcessing: ${path.basename(file)}`);
-            await processResultFile(file, pool, topIds, allowedCampuses);
+            await processResultFile(file, pool, topIds, allowedCampuses, processedGroups);
         }
 
+        console.log(`\nExecution Finished. Check "${path.basename(LOG_PATH)}" for missing column reports.`);
         process.exit(0);
     } catch (err) {
         console.error("Fatal Error:", err);
@@ -58,13 +64,14 @@ async function run() {
 
 function findResultFiles(dir) {
     let results = [];
+    if (!fs.existsSync(dir)) return results;
     const list = fs.readdirSync(dir);
     list.forEach(file => {
         const fullPath = path.join(dir, file);
         const stat = fs.statSync(fullPath);
         if (stat.isDirectory()) {
             results = results.concat(findResultFiles(fullPath));
-        } else if (file.endsWith('_All_India_Marks_Analysis.xlsx') && !file.startsWith('~$')) {
+        } else if (file.toUpperCase().includes('ALL_INDIA_MARKS_ANALYSIS') && file.endsWith('.xlsx') && !file.startsWith('~$')) {
             results.push(fullPath);
         }
     });
@@ -76,17 +83,28 @@ function cleanCampusName(name) {
     let cleaned = name.includes('/') ? name.split('/')[1] : name;
     cleaned = cleaned.replace(/PU COLLEGE\s+/i, '');
     cleaned = cleaned.replace(/PUC\s+/i, '');
+    cleaned = cleaned.replace(/MARTHAHALLY/i, 'MARTHAHALLI');
     return cleaned.trim();
 }
 
-function isKarnatakaCampus(name) {
+function isKarnatakaCampus(name, allowedCampuses) {
     if (!name) return false;
-    const upper = name.toUpperCase();
-    const keywords = ['BEN/', 'HUB/', 'MAN/', 'MYS/', 'TUM/', 'BAL/', 'KAR/', 'MANG/', 'BEL/'];
+    const upper = name.toUpperCase().trim();
+
+    // 1. Check if explicitly allowed in Uploader_Config.xlsx
+    if (allowedCampuses && allowedCampuses.has(upper)) return true;
+
+    // 2. Check by known Karnataka/Bangalore prefixes
+    const keywords = [
+        'BEN/', 'BAN/', 'SAR/', 'HUB/', 'DAV/', 'MYS/', 'TUM/',
+        'BEL/', 'BAL/', 'MANG/', 'KAR/', 'MAN/', 'BID/', 'KOL/',
+        'BAG/', 'GAD/', 'DHAD/', 'HASS/', 'CHI/', 'CHIT/', 'RAI/',
+        'BIJ/', 'KOP/', 'YAD/', 'UDU/', 'KOD/', 'HAW/'
+    ];
     return keywords.some(k => upper.includes(k));
 }
 
-async function processResultFile(filePath, pool, topIds, allowedCampuses) {
+async function processResultFile(filePath, pool, topIds, allowedCampuses, processedGroups) {
     const wb = XLSX.readFile(filePath);
     // Find the right sheet. Usually the last one or named like Main(Micro) or All-India...
     const sheetName = wb.SheetNames.find(s => s.includes('Main') || s.includes('All-India')) || wb.SheetNames[0];
@@ -147,41 +165,59 @@ async function processResultFile(filePath, pool, topIds, allowedCampuses) {
     // Convert Date to YYYY-MM-DD for TiDB
     let dbDate = formatDateToSQL(dateStr);
 
-    const headers = data[headerRowIdx].map(h => String(h || '').trim().replace(/\r\n/g, ' ').replace(/\s+/g, ' '));
-    const nextRow = data[headerRowIdx + 1] || [];
+    // Cross-file deduplication
+    const groupKey = `${testName}|${dbDate}|${batch}`;
+    if (processedGroups.has(groupKey)) {
+        console.log(`  [SKIP] Duplicate data group already processed for: ${groupKey}`);
+        return;
+    }
+    processedGroups.add(groupKey);
+
+    const hRow8 = data[headerRowIdx] || [];
+    const hRow9 = data[headerRowIdx + 1] || [];
+
+    // Merge headers from both rows for better context
+    const headers = hRow8.map((h, idx) => {
+        const p1 = String(h || '').trim().replace(/\r\n/g, ' ').replace(/\s+/g, ' ');
+        const p2 = String(hRow9[idx] || '').trim().replace(/\r\n/g, ' ').replace(/\s+/g, ' ');
+        return (p1 + ' ' + p2).trim();
+    });
 
     // Map Columns
     const findCol = (regex) => headers.findIndex(h => regex.test(h));
 
     const colMap = {
-        STUD_ID: findCol(/STUD_ID|STUD ID/i),
+        STUD_ID: findCol(/^STUD_ID|^STUD ID/i),
         NAME: findCol(/NAME OF THE STUDENT|STUDENT NAME/i),
-        CAMPUS: findCol(/CAMPUS/i),
-        TOT: findCol(/TOT/i),
+        CAMPUS: findCol(/^CAMPUS/i),
+        TOT: findCol(/^TOT \d+|^TOT$/i),
         AIR: findCol(/AIR RANK|AIR/i),
-        MAT: findCol(/^MAT /i) === -1 ? findCol(/^MAT$/i) : findCol(/^MAT /i),
-        PHY: findCol(/^PHY /i) === -1 ? findCol(/^PHY$/i) : findCol(/^PHY /i),
-        CHE: findCol(/^CHE /i) === -1 ? findCol(/^CHE$/i) : findCol(/^CHE /i),
+        MAT: findCol(/^MAT \d+|^MAT$/i),
+        PHY: findCol(/^PHY \d+|^PHY$/i),
+        CHE: findCol(/^CHE \d+|^CHE$/i),
         P1_P2: findCol(/P1|P2|P1\+P2/i),
         BEST3: findCol(/Best of three/i),
         B1000: findCol(/Below 1000 Target/i),
         JMAINS: findCol(/Jee Mains Target/i)
     };
 
-    // Sub-Percent matchers
+    // Use original row 8 for finding "RANK" or "%" labels if specific headers failed
+    const row8Headers = hRow8.map(h => String(h || '').trim().replace(/\r\n/g, ' ').replace(/\s+/g, ' '));
+
     const findPercentAfter = (baseIdx) => {
         if (baseIdx === -1) return -1;
-        // Search next few columns for %
         for (let i = baseIdx + 1; i < baseIdx + 6 && i < headers.length; i++) {
             if (headers[i].includes('%')) return i;
+            if (row8Headers[i] === '%') return i;
         }
         return -1;
     };
 
     const findRankAfter = (baseIdx) => {
         if (baseIdx === -1) return -1;
-        for (let i = baseIdx + 1; i < baseIdx + 3 && i < headers.length; i++) {
+        for (let i = baseIdx + 1; i < baseIdx + 4 && i < headers.length; i++) {
             if (headers[i].toUpperCase().includes('RANK')) return i;
+            if (row8Headers[i].toUpperCase().includes('RANK')) return i;
         }
         return -1;
     };
@@ -195,19 +231,42 @@ async function processResultFile(filePath, pool, topIds, allowedCampuses) {
     colMap.PHY_RANK = findRankAfter(colMap.PHY);
     colMap.CHE_RANK = findRankAfter(colMap.CHE);
 
+    // LOG MISSING COLUMNS
+    const missing = Object.keys(colMap).filter(k => colMap[k] === -1);
+    // Ignore optional columns in "essential" check for notification
+    const essentials = ['STUD_ID', 'NAME', 'CAMPUS', 'TOT', 'MAT', 'PHY', 'CHE'];
+    const missingEssentials = missing.filter(k => essentials.includes(k));
+
+    if (missing.length > 0) {
+        fs.appendFileSync(LOG_PATH, `FILE: ${path.basename(filePath)}\n`);
+        fs.appendFileSync(LOG_PATH, `MISSING COLUMNS: ${missing.join(', ')}\n`);
+        fs.appendFileSync(LOG_PATH, `-----------------------------------\n`);
+        console.log(`  [WARNING] Missing columns: ${missing.join(', ')}. Check log file.`);
+    }
+
     console.log(`  Header Row: ${headerRowIdx + 1}, Batch: ${batch}, Date: ${dbDate}, Test: ${testName}`);
 
     const studentsToUpload = [];
+    const seenRowsInFile = new Set();
+    let duplicateRowsCount = 0;
 
     for (let i = headerRowIdx + 2; i < data.length; i++) {
         const row = data[i];
         if (!row || !row[colMap.STUD_ID]) continue;
 
+        // 2. Row-level deduplication (Raw data check)
+        const rowSig = JSON.stringify(row);
+        if (seenRowsInFile.has(rowSig)) {
+            duplicateRowsCount++;
+            continue;
+        }
+        seenRowsInFile.add(rowSig);
+
         const studIdRaw = String(row[colMap.STUD_ID]).trim();
         const campusRaw = String(row[colMap.CAMPUS] || '').trim().toUpperCase();
 
         // 1. Karnataka/Bangalore Filter Logic
-        if (!isKarnatakaCampus(campusRaw)) continue;
+        if (!isKarnatakaCampus(campusRaw, allowedCampuses)) continue;
 
         const cleanedCampus = cleanCampusName(campusRaw);
 
@@ -239,6 +298,10 @@ async function processResultFile(filePath, pool, topIds, allowedCampuses) {
         };
 
         studentsToUpload.push(student);
+    }
+
+    if (duplicateRowsCount > 0) {
+        console.log(`  [INFO] Skipped ${duplicateRowsCount} duplicate rows found within the file.`);
     }
 
     console.log(`  Found ${studentsToUpload.length} students after filters.`);

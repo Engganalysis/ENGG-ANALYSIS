@@ -49,6 +49,11 @@ app.use((req, res, next) => {
     next();
 });
 
+// Health Check Endpoint (For UptimeRobot/Render)
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
 
 
 // Helper to build WHERE clause

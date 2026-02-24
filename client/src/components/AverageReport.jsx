@@ -6,11 +6,13 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 const AverageReport = ({ filters }) => {
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(false);
     const [hasSearched, setHasSearched] = useState(false);
+    const [currentStudentIndex, setCurrentStudentIndex] = useState(0);
     const [modal, setModal] = useState({ isOpen: false, type: 'info', title: '', message: '' });
 
 
@@ -18,6 +20,7 @@ const AverageReport = ({ filters }) => {
     useEffect(() => {
         setHistory([]);
         setHasSearched(false);
+        setCurrentStudentIndex(0);
     }, [filters.campus, filters.stream, filters.testType, filters.test, filters.topAll, filters.studentSearch]);
 
     const fetchData = async () => {
@@ -43,6 +46,7 @@ const AverageReport = ({ filters }) => {
             }
             const data = await response.json();
             setHistory(data);
+            setCurrentStudentIndex(0);
         } catch (err) {
             console.error("Fetch Error:", err);
             setModal({
@@ -57,6 +61,19 @@ const AverageReport = ({ filters }) => {
         }
     };
 
+    const getNormalizedStream = (data) => {
+        const streams = [...new Set(data.map(row => row.Batch?.trim().toUpperCase()).filter(Boolean))];
+        if (streams.length === 0) return '';
+
+        // Standardize common engineering batch names if needed
+        if (streams.some(s => s.includes('ELITE') || s.includes('AIIMS'))) {
+            if (streams.some(s => s.includes('SR'))) return 'SR ELITE';
+            if (streams.some(s => s.includes('JR'))) return 'JR ELITE';
+        }
+
+        return streams[0];
+    };
+
     const loadImage = (src) => {
         return new Promise((resolve) => {
             const img = new Image();
@@ -66,7 +83,7 @@ const AverageReport = ({ filters }) => {
         });
     };
 
-    const generateStudentPDF = (studentData, bgImg, logoImg, impactFont, bookmanFont, bookmanBoldFont) => {
+    const generateStudentPDF = (studentData, logoImg, impactFont, bookmanFont, bookmanBoldFont) => {
         const doc = new jsPDF('p', 'mm', 'a4');
 
         // Add Fonts
@@ -83,21 +100,9 @@ const AverageReport = ({ filters }) => {
             doc.addFont("BOOKOSB.TTF", "Bookman", "bold");
         }
 
-        // Draw background on first page
-        if (bgImg) {
-            try {
-                doc.addImage(bgImg, 'PNG', 0, 0, 210, 297, undefined, 'FAST');
-            } catch (e) { }
-        }
-
-        // Add event listener for SUBSEQUENT pages to draw background BEFORE content
-        doc.internal.events.subscribe('addPage', () => {
-            if (bgImg) {
-                try {
-                    doc.addImage(bgImg, 'PNG', 0, 0, 210, 297, undefined, 'FAST');
-                } catch (e) { }
-            }
-        });
+        // Plain Background - fulfill "pastel plain" by using a very subtle pastel tint
+        doc.setFillColor(255, 255, 255); // Plain White for best printability
+        doc.rect(0, 0, 210, 297, 'F');
 
         let currentY = 11; // Reduced top margin
 
@@ -218,6 +223,17 @@ const AverageReport = ({ filters }) => {
             if (bookmanFont) doc.setFont("Bookman", "bold");
             else doc.setFont("helvetica", "normal");
             doc.text(student.STUD_ID?.toString() || '', col1X + 30, row2Y);
+
+            // Stream (Added as per user request to match NEET styles)
+            const normalizedStream = getNormalizedStream(studentData);
+            if (bookmanFont) doc.setFont("Bookman", "bold");
+            else doc.setFont("helvetica", "bold");
+            doc.text("Stream:", col2X, row2Y);
+
+            if (bookmanFont) doc.setFont("Bookman", "bold");
+            else doc.setFont("helvetica", "normal");
+            doc.text(normalizedStream, col2X + 22, row2Y);
+
             currentY += 18;
         }
 
@@ -266,7 +282,7 @@ const AverageReport = ({ filters }) => {
             styles: {
                 font: bookmanFont ? "Bookman" : "helvetica", // Use Bookman
                 fontSize: 9,
-                cellPadding: 2.5,
+                cellPadding: 1.2, // Reduced to save space for printing
                 overflow: 'linebreak',
                 halign: 'center',
                 valign: 'middle',
@@ -275,7 +291,13 @@ const AverageReport = ({ filters }) => {
                 textColor: [0, 0, 0]
             },
             columnStyles: {
-                0: { halign: 'center' } // Centered and auto-fit
+                0: { halign: 'center', cellWidth: 70 }, // Test Name
+                1: { cellWidth: 30 }, // Date
+                2: { cellWidth: 20, fillColor: [255, 255, 204] }, // Total
+                3: { cellWidth: 15 }, // AIR
+                4: { cellWidth: 15, fillColor: [253, 233, 217] }, // Mat
+                5: { cellWidth: 15, fillColor: [235, 241, 222] }, // Phy
+                6: { cellWidth: 15, fillColor: [242, 220, 219] }  // Chem
             },
             margin: { left: 15, right: 15, bottom: 15 },
             didParseCell: (data) => {
@@ -316,8 +338,7 @@ const AverageReport = ({ filters }) => {
                 }
             };
 
-            const [bgImg, logoImg, impactFont, bookmanFont, bookmanBoldFont] = await Promise.all([
-                loadImage('/college-bg.png'),
+            const [logoImg, impactFont, bookmanFont, bookmanBoldFont] = await Promise.all([
                 loadImage('/logo.png'),
                 loadFont('/fonts/unicode.impact.ttf'),
                 loadFont('/fonts/bookman-old-style.ttf'),
@@ -337,7 +358,7 @@ const AverageReport = ({ filters }) => {
 
             if (studentIds.length === 1) {
                 // Single Download
-                const doc = generateStudentPDF(grouped[studentIds[0]], bgImg, logoImg, impactFont, bookmanFont, bookmanBoldFont);
+                const doc = generateStudentPDF(grouped[studentIds[0]], logoImg, impactFont, bookmanFont, bookmanBoldFont);
                 const sName = grouped[studentIds[0]][0].NAME_OF_THE_STUDENT || 'Report';
                 doc.save(`${sName}_Progress_Report.pdf`);
             } else {
@@ -348,7 +369,7 @@ const AverageReport = ({ filters }) => {
                 studentIds.forEach(id => {
                     const sRows = grouped[id];
                     const sName = sRows[0].NAME_OF_THE_STUDENT || id;
-                    const doc = generateStudentPDF(sRows, bgImg, logoImg, impactFont, bookmanFont, bookmanBoldFont);
+                    const doc = generateStudentPDF(sRows, logoImg, impactFont, bookmanFont, bookmanBoldFont);
                     const pdfBlob = doc.output('blob');
                     zip.file(`${sName}_Progress_Report.pdf`, pdfBlob);
                 });
@@ -356,7 +377,6 @@ const AverageReport = ({ filters }) => {
                 const content = await zip.generateAsync({ type: "blob" });
                 saveAs(content, `${campusName}_Progress_Reports.zip`);
             }
-
         } catch (err) {
             console.error("PDF Generation Error:", err);
             setModal({
@@ -374,15 +394,23 @@ const AverageReport = ({ filters }) => {
     // For now, let's show the FIRST student's data as a preview if multiple are selected,
     // possibly adding a banner saying "X Students Selected".
 
-    // Helper to get preview student
-    const previewStudent = history.length > 0 ? history[0] : null;
-    // Actually, if mixed, history[0] is just the first row. We need to find rows for that student.
-    const previewRows = previewStudent
-        ? history.filter(h => h.STUD_ID?.toString() === previewStudent.STUD_ID?.toString())
+    // Unique students logic
+    const uniqueStudentIds = [...new Set(history.map(h => h.STUD_ID))];
+    const uniqueStudents = uniqueStudentIds.length;
+
+    // Helper to get preview student based on navigation
+    const previewStudentId = uniqueStudentIds[currentStudentIndex];
+    const previewRows = previewStudentId
+        ? history.filter(h => h.STUD_ID?.toString() === previewStudentId.toString())
         : [];
 
-    // Unique students count
-    const uniqueStudents = new Set(history.map(h => h.STUD_ID)).size;
+    const handleNext = () => {
+        setCurrentStudentIndex(prev => (prev + 1) % uniqueStudents);
+    };
+
+    const handlePrev = () => {
+        setCurrentStudentIndex(prev => (prev - 1 + uniqueStudents) % uniqueStudents);
+    };
 
     return (
         <div className="average-report-container">
@@ -391,9 +419,17 @@ const AverageReport = ({ filters }) => {
                     <div>
                         <h3 style={{ margin: 0 }}>Detailed Performance</h3>
                         {uniqueStudents > 1 && (
-                            <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                                (Previewing 1 of {uniqueStudents} selected students)
-                            </span>
+                            <div className="navigation-status" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                                <button className="nav-btn" onClick={handlePrev} title="Previous Student">
+                                    <ChevronLeft size={16} />
+                                </button>
+                                <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '500' }}>
+                                    Student {currentStudentIndex + 1} of {uniqueStudents}
+                                </span>
+                                <button className="nav-btn" onClick={handleNext} title="Next Student">
+                                    <ChevronRight size={16} />
+                                </button>
+                            </div>
                         )}
                     </div>
                     <div className="button-group" style={{ display: 'flex', gap: '10px' }}>
@@ -425,7 +461,7 @@ const AverageReport = ({ filters }) => {
                                 <table className="analysis-table merit-style" style={{ fontFamily: 'Bookman, serif' }}>
                                     <thead style={{ fontWeight: 'bold' }}>
                                         <tr className="grouped-header">
-                                            <th colSpan={3} className="header-group-blue">
+                                            <th colSpan={2} className="header-group-blue">
                                                 <div className="header-label">CAMPUS</div>
                                                 <div className="header-value">{previewRows[0].CAMPUS_NAME}</div>
                                             </th>
@@ -433,7 +469,11 @@ const AverageReport = ({ filters }) => {
                                                 <div className="header-label">STUD ID</div>
                                                 <div className="header-value">{previewRows[0].STUD_ID}</div>
                                             </th>
-                                            <th colSpan={5} className="header-group-blue">
+                                            <th colSpan={2} className="header-group-blue">
+                                                <div className="header-label">STREAM</div>
+                                                <div className="header-value">{getNormalizedStream(previewRows)}</div>
+                                            </th>
+                                            <th colSpan={2} className="header-group-blue">
                                                 <div className="header-label">NAME OF THE STUDENT</div>
                                                 <div className="header-value">
                                                     {previewRows[0].NAME_OF_THE_STUDENT}
