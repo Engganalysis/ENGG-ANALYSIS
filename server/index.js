@@ -84,19 +84,21 @@ const buildWhereClause = (req, options = {}) => {
     if (!options.ignoreTopAll) addClause('Top_ALL', topAll);
 
     // If specific student IDs are selected, use them exclusively
-    const sSearch = Array.isArray(studentSearch) ? studentSearch : (studentSearch ? [studentSearch] : []);
-    const cleanIds = sSearch
-        .filter(id => id && id !== 'null' && id !== 'undefined')
-        .map(id => id.toString().trim().toUpperCase().replace(/'/g, "''"))
-        .filter(v => v !== '');
+    if (!options.ignoreStudent) {
+        const sSearch = Array.isArray(studentSearch) ? studentSearch : (studentSearch ? [studentSearch] : []);
+        const cleanIds = sSearch
+            .filter(id => id && id !== 'null' && id !== 'undefined')
+            .map(id => id.toString().trim().toUpperCase().replace(/'/g, "''"))
+            .filter(v => v !== '');
 
-    if (cleanIds.length > 0) {
-        const list = cleanIds.map(v => `'${v}'`).join(',');
-        clauses.push(`UPPER(TRIM(STUD_ID)) IN (${list})`);
-    } else if (quickSearch && typeof quickSearch === 'string' && quickSearch.trim() !== '') {
-        // Only use quickSearch LIKE if no specific student is selected
-        const safeSearch = quickSearch.trim().replace(/'/g, "''").toUpperCase();
-        clauses.push(`(UPPER(TRIM(NAME_OF_THE_STUDENT)) LIKE '%${safeSearch}%' OR UPPER(TRIM(STUD_ID)) LIKE '%${safeSearch}%')`);
+        if (cleanIds.length > 0) {
+            const list = cleanIds.map(v => `'${v}'`).join(',');
+            clauses.push(`UPPER(TRIM(STUD_ID)) IN (${list})`);
+        } else if (quickSearch && typeof quickSearch === 'string' && quickSearch.trim() !== '') {
+            // Only use quickSearch LIKE if no specific student is selected
+            const safeSearch = quickSearch.trim().replace(/'/g, "''").toUpperCase();
+            clauses.push(`(UPPER(TRIM(NAME_OF_THE_STUDENT)) LIKE '%${safeSearch}%' OR UPPER(TRIM(STUD_ID)) LIKE '%${safeSearch}%')`);
+        }
     }
 
     const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
@@ -346,7 +348,8 @@ app.get('/api/history', async (req, res) => {
                 CHE as CHE,
                 NAME_OF_THE_STUDENT,
                 CAMPUS_NAME,
-                STUD_ID
+                STUD_ID,
+                Batch
             FROM ENGG_RESULT 
             ${whereClause}
             ORDER BY STR_TO_DATE(DATE, '%Y-%m-%d') ASC
@@ -354,7 +357,36 @@ app.get('/api/history', async (req, res) => {
 
         logQuery(query, req.query);
         const result = await pool.request().query(query);
-        res.json(result.recordset);
+        const historyData = result.recordset;
+
+        // Fetch Batch Master Exams for comparison
+        let batchExams = [];
+        if (historyData.length > 0) {
+            const batches = [...new Set(historyData.map(h => h.Batch).filter(Boolean))];
+            if (batches.length > 0) {
+                const batchList = batches.map(b => `'${b.replace(/'/g, "''")}'`).join(',');
+                const bWhere = buildWhereClause(req, { ignoreStudent: true, ignoreCampus: false });
+                const finalBWhere = bWhere ? `${bWhere} AND Batch IN (${batchList})` : `WHERE Batch IN (${batchList})`;
+
+                const bQuery = `
+                    SELECT DISTINCT 
+                        TRIM(Test) as Test, 
+                        DATE, 
+                        TRIM(Batch) as Batch, 
+                        TRIM(P1_P2) as P1_P2
+                    FROM ENGG_RESULT
+                    ${finalBWhere}
+                    ORDER BY DATE ASC, Test ASC
+                `;
+                const bRes = await pool.request().query(bQuery);
+                batchExams = bRes.recordset;
+            }
+        }
+
+        res.json({
+            history: historyData,
+            batchExams: batchExams
+        });
     } catch (err) {
         console.error(err);
         res.status(500).send(err.message);

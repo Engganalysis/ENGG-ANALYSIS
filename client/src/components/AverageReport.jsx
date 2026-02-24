@@ -9,7 +9,7 @@ import { saveAs } from 'file-saver';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 const AverageReport = ({ filters }) => {
-    const [history, setHistory] = useState([]);
+    const [history, setHistory] = useState({ history: [], batchExams: [] });
     const [loading, setLoading] = useState(false);
     const [hasSearched, setHasSearched] = useState(false);
     const [currentStudentIndex, setCurrentStudentIndex] = useState(0);
@@ -18,7 +18,7 @@ const AverageReport = ({ filters }) => {
 
     // Reset results when filters change to maintain consistency
     useEffect(() => {
-        setHistory([]);
+        setHistory({ history: [], batchExams: [] });
         setHasSearched(false);
         setCurrentStudentIndex(0);
     }, [filters.campus, filters.stream, filters.testType, filters.test, filters.topAll, filters.studentSearch]);
@@ -59,6 +59,39 @@ const AverageReport = ({ filters }) => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const reconcileHistory = (studentRows, bExams = history.batchExams) => {
+        if (!bExams || bExams.length === 0) return studentRows;
+
+        // Ensure we handle students who might have zero rows but are in selection
+        // Actually, for history, studentRows will have at least one row if they took any exam.
+        const baseInfo = studentRows[0] || {};
+
+        return bExams.map(master => {
+            const mDate = formatDate(master.DATE);
+            const mName = String(master.Test || '').trim().toUpperCase();
+
+            const match = studentRows.find(r =>
+                String(r.Test || '').trim().toUpperCase() === mName &&
+                formatDate(r.DATE) === mDate
+            );
+
+            if (match) return match;
+
+            return {
+                ...master,
+                STUD_ID: baseInfo.STUD_ID || 'N/A',
+                NAME_OF_THE_STUDENT: baseInfo.NAME_OF_THE_STUDENT || 'N/A',
+                CAMPUS_NAME: baseInfo.CAMPUS_NAME || 'N/A',
+                isAbsent: true,
+                Total: 'AB',
+                AIR: 'AB',
+                MAT: 'AB',
+                PHY: 'AB',
+                CHE: 'AB'
+            };
+        });
     };
 
     const getNormalizedStream = (data) => {
@@ -250,8 +283,10 @@ const AverageReport = ({ filters }) => {
 
         // Average
         if (studentData.length > 0) {
-            const avg = (key) => Math.round(studentData.reduce((a, b) => a + (Number(b[key]) || 0), 0) / studentData.length);
-            const avgAIR = Math.round(studentData.reduce((a, b) => a + (Number(b.AIR) || 0), 0) / studentData.length);
+            const attempted = studentData.filter(r => !r.isAbsent);
+            const count = attempted.length || 1;
+            const avg = (key) => Math.round(attempted.reduce((a, b) => a + (Number(b[key]) || 0), 0) / count);
+            const avgAIR = Math.round(attempted.reduce((a, b) => a + (Number(b.AIR) || 0), 0) / count);
 
             tableRows.push([
                 "AVERAGE",
@@ -312,6 +347,10 @@ const AverageReport = ({ filters }) => {
                     }
                     data.cell.styles.fillColor = [224, 231, 255];
                     data.cell.styles.textColor = [0, 0, 0];
+                } else if (data.cell.text && data.cell.text.includes('AB')) {
+                    // Styling for Absence (AB) in PDF
+                    data.cell.styles.textColor = [255, 0, 0]; // Red
+                    data.cell.styles.fontStyle = 'bold';
                 }
             }
         });
@@ -346,7 +385,8 @@ const AverageReport = ({ filters }) => {
             ]);
 
             // Group by Student ID
-            const grouped = history.reduce((acc, row) => {
+            const historyData = history.history || [];
+            const grouped = historyData.reduce((acc, row) => {
                 const id = row.STUD_ID || 'Unknown';
                 if (!acc[id]) acc[id] = [];
                 acc[id].push(row);
@@ -358,8 +398,11 @@ const AverageReport = ({ filters }) => {
 
             if (studentIds.length === 1) {
                 // Single Download
-                const doc = generateStudentPDF(grouped[studentIds[0]], logoImg, impactFont, bookmanFont, bookmanBoldFont);
-                const sName = grouped[studentIds[0]][0].NAME_OF_THE_STUDENT || 'Report';
+                const id = studentIds[0];
+                const sRows = grouped[id];
+                const reconciled = reconcileHistory(sRows, history.batchExams);
+                const doc = generateStudentPDF(reconciled, logoImg, impactFont, bookmanFont, bookmanBoldFont);
+                const sName = sRows[0].NAME_OF_THE_STUDENT || 'Report';
                 doc.save(`${sName}_Progress_Report.pdf`);
             } else {
                 // Bulk Download (ZIP)
@@ -368,8 +411,9 @@ const AverageReport = ({ filters }) => {
 
                 studentIds.forEach(id => {
                     const sRows = grouped[id];
+                    const reconciled = reconcileHistory(sRows, history.batchExams);
                     const sName = sRows[0].NAME_OF_THE_STUDENT || id;
-                    const doc = generateStudentPDF(sRows, logoImg, impactFont, bookmanFont, bookmanBoldFont);
+                    const doc = generateStudentPDF(reconciled, logoImg, impactFont, bookmanFont, bookmanBoldFont);
                     const pdfBlob = doc.output('blob');
                     zip.file(`${sName}_Progress_Report.pdf`, pdfBlob);
                 });
@@ -395,14 +439,17 @@ const AverageReport = ({ filters }) => {
     // possibly adding a banner saying "X Students Selected".
 
     // Unique students logic
-    const uniqueStudentIds = [...new Set(history.map(h => h.STUD_ID))];
+    const historyData = history.history || [];
+    const uniqueStudentIds = [...new Set(historyData.map(h => h.STUD_ID))];
     const uniqueStudents = uniqueStudentIds.length;
 
     // Helper to get preview student based on navigation
     const previewStudentId = uniqueStudentIds[currentStudentIndex];
-    const previewRows = previewStudentId
-        ? history.filter(h => h.STUD_ID?.toString() === previewStudentId.toString())
+    const previewRowsRaw = previewStudentId
+        ? historyData.filter(h => h.STUD_ID?.toString() === previewStudentId.toString())
         : [];
+
+    const previewRows = reconcileHistory(previewRowsRaw);
 
     const handleNext = () => {
         setCurrentStudentIndex(prev => (prev + 1) % uniqueStudents);
@@ -436,7 +483,7 @@ const AverageReport = ({ filters }) => {
                         <button className="btn-primary" onClick={fetchData} style={{ backgroundColor: '#6366f1' }}>
                             View Report
                         </button>
-                        <button className="btn-primary" onClick={downloadPDF} disabled={history.length === 0} style={{ backgroundColor: '#10b981' }}>
+                        <button className="btn-primary" onClick={downloadPDF} disabled={historyData.length === 0} style={{ backgroundColor: '#10b981' }}>
                             {uniqueStudents > 1 ? `Download All (${uniqueStudents})` : 'Download PDF'}
                         </button>
                     </div>
@@ -450,7 +497,7 @@ const AverageReport = ({ filters }) => {
                     <div className="empty-state">
                         <p>Select a student and click <strong>View Report</strong> to see detailed performance.</p>
                     </div>
-                ) : history.length === 0 ? (
+                ) : historyData.length === 0 ? (
                     <div className="empty-state">
                         <p>No data found for this student with the current filters.</p>
                     </div>
@@ -493,23 +540,33 @@ const AverageReport = ({ filters }) => {
                                     </thead>
                                     <tbody>
                                         {previewRows.map((row, idx) => (
-                                            <tr key={idx}>
+                                            <tr key={idx} style={row.isAbsent ? { color: '#ff0000', fontWeight: 'bold' } : {}}>
                                                 <td>{row.Test}</td>
                                                 <td>{formatDate(row.DATE)}</td>
-                                                <td className="col-yellow font-bold">{Number(row.Total || 0).toFixed(1)}</td>
-                                                <td className="text-brown">{Math.round(row.AIR) || '-'}</td>
-                                                <td className="col-orange">{Number(row.MAT || 0).toFixed(1)}</td>
-                                                <td className="col-green-pale">{Number(row.PHY || 0).toFixed(1)}</td>
-                                                <td className="col-pink-pale">{Number(row.CHE || 0).toFixed(1)}</td>
+                                                <td className={row.isAbsent ? "font-bold" : "col-yellow font-bold"}>
+                                                    {row.isAbsent ? 'AB' : Number(row.Total || 0).toFixed(1)}
+                                                </td>
+                                                <td className={row.isAbsent ? "" : "text-brown"}>
+                                                    {row.isAbsent ? 'AB' : (Math.round(row.AIR) || '-')}
+                                                </td>
+                                                <td className={row.isAbsent ? "" : "col-orange"}>
+                                                    {row.isAbsent ? 'AB' : Number(row.MAT || 0).toFixed(1)}
+                                                </td>
+                                                <td className={row.isAbsent ? "" : "col-green-pale"}>
+                                                    {row.isAbsent ? 'AB' : Number(row.PHY || 0).toFixed(1)}
+                                                </td>
+                                                <td className={row.isAbsent ? "" : "col-pink-pale"}>
+                                                    {row.isAbsent ? 'AB' : Number(row.CHE || 0).toFixed(1)}
+                                                </td>
                                             </tr>
                                         ))}
                                         <tr className="total-row">
                                             <td colSpan={2} className="text-right">AVERAGES</td>
-                                            <td className="col-yellow">{(previewRows.reduce((a, b) => a + (Number(b.Total) || 0), 0) / previewRows.length).toFixed(1)}</td>
-                                            <td>{Math.round(previewRows.reduce((a, b) => a + (Number(b.AIR) || 0), 0) / previewRows.length)}</td>
-                                            <td className="col-orange">{(previewRows.reduce((a, b) => a + (Number(b.MAT) || 0), 0) / previewRows.length).toFixed(1)}</td>
-                                            <td className="col-green-pale">{(previewRows.reduce((a, b) => a + (Number(b.PHY) || 0), 0) / previewRows.length).toFixed(1)}</td>
-                                            <td className="col-pink-pale">{(previewRows.reduce((a, b) => a + (Number(b.CHE) || 0), 0) / previewRows.length).toFixed(1)}</td>
+                                            <td className="col-yellow">{(previewRows.filter(r => !r.isAbsent).reduce((a, b) => a + (Number(b.Total) || 0), 0) / (previewRows.filter(r => !r.isAbsent).length || 1)).toFixed(1)}</td>
+                                            <td>{Math.round(previewRows.filter(r => !r.isAbsent).reduce((a, b) => a + (Number(b.AIR) || 0), 0) / (previewRows.filter(r => !r.isAbsent).length || 1))}</td>
+                                            <td className="col-orange">{(previewRows.filter(r => !r.isAbsent).reduce((a, b) => a + (Number(b.MAT) || 0), 0) / (previewRows.filter(r => !r.isAbsent).length || 1)).toFixed(1)}</td>
+                                            <td className="col-green-pale">{(previewRows.filter(r => !r.isAbsent).reduce((a, b) => a + (Number(b.PHY) || 0), 0) / (previewRows.filter(r => !r.isAbsent).length || 1)).toFixed(1)}</td>
+                                            <td className="col-pink-pale">{(previewRows.filter(r => !r.isAbsent).reduce((a, b) => a + (Number(b.CHE) || 0), 0) / (previewRows.filter(r => !r.isAbsent).length || 1)).toFixed(1)}</td>
                                         </tr>
                                     </tbody>
                                 </table>
