@@ -147,8 +147,8 @@ const AverageMarksReport = ({ filters }) => {
             border: borderStyle
         });
 
-        // ROW 1: Logo + SRI CHAITANYA... Header (Merged A1:O1)
-        worksheet.mergeCells('A1:O1');
+        // ROW 1: Logo + SRI CHAITANYA... Header (Merged A1:M1)
+        worksheet.mergeCells('A1:M1');
         const row1 = worksheet.getCell('A1');
         row1.value = {
             richText: [
@@ -158,9 +158,9 @@ const AverageMarksReport = ({ filters }) => {
         };
         row1.alignment = { horizontal: 'center', vertical: 'middle' };
         row1.border = borderStyle;
-        worksheet.getRow(1).height = 50; // Reduced height to tighten space
+        worksheet.getRow(1).height = 50;
 
-        // Add Logo inside A1 area
+        // Add Logo centered in B column (index 1)
         try {
             const response = await fetch('/logo.png');
             const blob = await response.blob();
@@ -170,7 +170,7 @@ const AverageMarksReport = ({ filters }) => {
                 extension: 'png',
             });
             worksheet.addImage(imageId, {
-                tl: { col: 0.1, row: 0.1 },
+                tl: { col: 1.1, row: 0.1 },
                 ext: { width: 65, height: 60 },
                 editAs: 'oneCell'
             });
@@ -178,7 +178,8 @@ const AverageMarksReport = ({ filters }) => {
             console.error("Failed to add logo to excel:", e);
         }
 
-        // ROW 2: Left Header Block (A2:C2) - MS Gothic 16
+        // ROW 2: Left Header Block (A2:C2) 
+        worksheet.mergeCells('A2:C2');
         const cellA2 = worksheet.getCell('A2');
         const headerTextStr = `2025-26_${stream}_ENGG_Estimated Avg's`;
         const parts = headerTextStr.split(stream);
@@ -193,8 +194,8 @@ const AverageMarksReport = ({ filters }) => {
         cellA2.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
         cellA2.border = borderStyle;
 
-        // ROW 2: Right Header Block (D2:O2) - Wrap text
-        worksheet.mergeCells('D2:O2');
+        // ROW 2: Right Header Block (D2:M2) - Wrap text
+        worksheet.mergeCells('D2:M2');
         const cellD2 = worksheet.getCell('D2');
         cellD2.value = {
             richText: [
@@ -202,9 +203,9 @@ const AverageMarksReport = ({ filters }) => {
                 { text: datesStrWrap, font: { color: { argb: 'FF000000' }, name: 'Arial', size: 10 } }
             ]
         };
-        cellD2.alignment = { horizontal: 'left', vertical: 'top', wrapText: true };
+        cellD2.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
         cellD2.border = borderStyle;
-        worksheet.getRow(2).height = 60; // Reduced height to tighten space
+        worksheet.getRow(2).height = 60;
 
         // ROW 3: Column Headers
         const headerLabels = ["STUD_ID", "Name", "Campus", "MAT\n100", "M_R", "PHY\n100", "P_R", "CHE\n100", "C_R", "TOT\n300", "Rank", "T_App", "T_Cnt"];

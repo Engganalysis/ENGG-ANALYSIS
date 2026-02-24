@@ -233,9 +233,9 @@ const AverageReport = ({ filters }) => {
             else doc.setFont("helvetica", "bold");
             doc.text("Student Name:", col1X, textYStart);
 
-            if (bookmanFont) doc.setFont("Bookman", "bold"); // Also bold for values as per "same progress report also Bold"? Or just labels? Usually values are normal. keeping normal for values based on typical reports, but user said "same progress report also Bold". Let's assume headers/labels are bold.
+            if (bookmanFont) doc.setFont("Bookman", "bold");
             else doc.setFont("helvetica", "normal");
-            doc.text(student.NAME_OF_THE_STUDENT || '', col1X + 30, textYStart);
+            doc.text(student.NAME_OF_THE_STUDENT || '', col1X + 30, textYStart, { maxWidth: 62 });
 
             // Campus
             if (bookmanFont) doc.setFont("Bookman", "bold");
@@ -244,7 +244,7 @@ const AverageReport = ({ filters }) => {
 
             if (bookmanFont) doc.setFont("Bookman", "bold");
             else doc.setFont("helvetica", "normal");
-            doc.text(student.CAMPUS_NAME || '', col2X + 22, textYStart);
+            doc.text(student.CAMPUS_NAME || '', col2X + 22, textYStart, { maxWidth: 58 });
 
             const row2Y = textYStart + 7;
 
@@ -265,7 +265,7 @@ const AverageReport = ({ filters }) => {
 
             if (bookmanFont) doc.setFont("Bookman", "bold");
             else doc.setFont("helvetica", "normal");
-            doc.text(normalizedStream, col2X + 22, row2Y);
+            doc.text(normalizedStream, col2X + 22, row2Y, { maxWidth: 58 });
 
             currentY += 18;
         }
@@ -274,11 +274,11 @@ const AverageReport = ({ filters }) => {
         const tableRows = studentData.map(row => [
             row.Test,
             formatDate(row.DATE),
-            Math.round(row.Total || 0),
-            Math.round(row.AIR) || '-',
-            Math.round(row.MAT || 0),
-            Math.round(row.PHY || 0),
-            Math.round(row.CHE || 0)
+            row.isAbsent ? 'AB' : Math.round(row.Total || 0),
+            row.isAbsent ? 'AB' : (Math.round(row.AIR) || '-'),
+            row.isAbsent ? 'AB' : Math.round(row.MAT || 0),
+            row.isAbsent ? 'AB' : Math.round(row.PHY || 0),
+            row.isAbsent ? 'AB' : Math.round(row.CHE || 0)
         ]);
 
         // Average
@@ -347,7 +347,7 @@ const AverageReport = ({ filters }) => {
                     }
                     data.cell.styles.fillColor = [224, 231, 255];
                     data.cell.styles.textColor = [0, 0, 0];
-                } else if (data.cell.text && data.cell.text.includes('AB')) {
+                } else if (data.cell.raw === 'AB' || (data.cell.text && String(data.cell.text).includes('AB'))) {
                     // Styling for Absence (AB) in PDF
                     data.cell.styles.textColor = [255, 0, 0]; // Red
                     data.cell.styles.fontStyle = 'bold';
@@ -541,21 +541,21 @@ const AverageReport = ({ filters }) => {
                                     <tbody>
                                         {previewRows.map((row, idx) => (
                                             <tr key={idx} style={row.isAbsent ? { color: '#ff0000', fontWeight: 'bold' } : {}}>
-                                                <td>{row.Test}</td>
-                                                <td>{formatDate(row.DATE)}</td>
-                                                <td className={row.isAbsent ? "font-bold" : "col-yellow font-bold"}>
+                                                <td style={row.isAbsent ? { color: '#ff0000' } : {}}>{row.Test}</td>
+                                                <td style={row.isAbsent ? { color: '#ff0000' } : {}}>{formatDate(row.DATE)}</td>
+                                                <td className={row.isAbsent ? "font-bold" : "col-yellow font-bold"} style={row.isAbsent ? { color: '#ff0000' } : {}}>
                                                     {row.isAbsent ? 'AB' : Number(row.Total || 0).toFixed(1)}
                                                 </td>
-                                                <td className={row.isAbsent ? "" : "text-brown"}>
+                                                <td className={row.isAbsent ? "" : "text-brown"} style={row.isAbsent ? { color: '#ff0000' } : {}}>
                                                     {row.isAbsent ? 'AB' : (Math.round(row.AIR) || '-')}
                                                 </td>
-                                                <td className={row.isAbsent ? "" : "col-orange"}>
+                                                <td className={row.isAbsent ? "" : "col-orange"} style={row.isAbsent ? { color: '#ff0000' } : {}}>
                                                     {row.isAbsent ? 'AB' : Number(row.MAT || 0).toFixed(1)}
                                                 </td>
-                                                <td className={row.isAbsent ? "" : "col-green-pale"}>
+                                                <td className={row.isAbsent ? "" : "col-green-pale"} style={row.isAbsent ? { color: '#ff0000' } : {}}>
                                                     {row.isAbsent ? 'AB' : Number(row.PHY || 0).toFixed(1)}
                                                 </td>
-                                                <td className={row.isAbsent ? "" : "col-pink-pale"}>
+                                                <td className={row.isAbsent ? "" : "col-pink-pale"} style={row.isAbsent ? { color: '#ff0000' } : {}}>
                                                     {row.isAbsent ? 'AB' : Number(row.CHE || 0).toFixed(1)}
                                                 </td>
                                             </tr>
