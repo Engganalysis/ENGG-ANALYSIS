@@ -309,15 +309,16 @@ const AnalysisReport = ({ filters }) => {
             currentY += 10;
 
             // 4. Data Tables
+            const showMax = examStats.length === 1;
             const tableColumn = [
                 { content: "STUD ID", rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
                 { content: "NAME OF THE STUDENT", rowSpan: 2, styles: { halign: 'left', valign: 'middle' } },
                 { content: "CAMPUS NAME", rowSpan: 2, styles: { halign: 'left', valign: 'middle' } },
-                { content: `Total\n(${Math.round(studentMarks[0]?.max_tot || 300)})`, rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [255, 255, 204] } },
+                { content: showMax ? `Total\n(${Math.round(studentMarks[0]?.max_tot || 300)})` : "Total", rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [255, 255, 204] } },
                 { content: "AIR", rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [255, 255, 153] } },
-                { content: `Mathematics\n(${Math.round(studentMarks[0]?.max_mat || 100)})`, colSpan: 2, styles: { halign: 'center', fillColor: [253, 233, 217] } },
-                { content: `Physics\n(${Math.round(studentMarks[0]?.max_phy || 100)})`, colSpan: 2, styles: { halign: 'center', fillColor: [235, 241, 222] } },
-                { content: `Chemistry\n(${Math.round(studentMarks[0]?.max_che || 100)})`, colSpan: 2, styles: { halign: 'center', fillColor: [242, 220, 219] } }
+                { content: showMax ? `Mathematics\n(${Math.round(studentMarks[0]?.max_mat || 100)})` : "Mathematics", colSpan: 2, styles: { halign: 'center', fillColor: [253, 233, 217] } },
+                { content: showMax ? `Physics\n(${Math.round(studentMarks[0]?.max_phy || 100)})` : "Physics", colSpan: 2, styles: { halign: 'center', fillColor: [235, 241, 222] } },
+                { content: showMax ? `Chemistry\n(${Math.round(studentMarks[0]?.max_che || 100)})` : "Chemistry", colSpan: 2, styles: { halign: 'center', fillColor: [242, 220, 219] } }
             ];
 
             const subHeader = [
@@ -439,13 +440,14 @@ const AnalysisReport = ({ filters }) => {
             worksheet.addRow([]);
 
             // 3. Multi-level Headers (Rows 4 & 5)
+            const showMax = examStats.length === 1;
             const headerRow4Values = [
                 'STUD ID', 'NAME OF THE STUDENT', 'CAMPUS NAME',
-                `Total (${Math.round(studentMarks[0]?.max_tot || 300)})`,
+                showMax ? `Total (${Math.round(studentMarks[0]?.max_tot || 300)})` : 'Total',
                 'AIR',
-                `Mathematics (${Math.round(studentMarks[0]?.max_mat || 100)})`, '',
-                `Physics (${Math.round(studentMarks[0]?.max_phy || 100)})`, '',
-                `Chemistry (${Math.round(studentMarks[0]?.max_che || 100)})`, '',
+                showMax ? `Mathematics (${Math.round(studentMarks[0]?.max_mat || 100)})` : 'Mathematics', '',
+                showMax ? `Physics (${Math.round(studentMarks[0]?.max_phy || 100)})` : 'Physics', '',
+                showMax ? `Chemistry (${Math.round(studentMarks[0]?.max_che || 100)})` : 'Chemistry', '',
                 'EXAMS'
             ];
             worksheet.addRow(headerRow4Values);
@@ -596,8 +598,7 @@ const AnalysisReport = ({ filters }) => {
                                         <th onClick={() => requestSort(setStatsSortConfig, 'DATE')}>Date <SortIcon config={statsSortConfig} columnKey="DATE" /></th>
                                         <th onClick={() => requestSort(setStatsSortConfig, 'Test')} style={{ whiteSpace: 'nowrap' }}>Test Name <SortIcon config={statsSortConfig} columnKey="Test" /></th>
                                         <th onClick={() => requestSort(setStatsSortConfig, 'Attn')} style={{ color: 'var(--accent)' }}>Attn <SortIcon config={statsSortConfig} columnKey="Attn" /></th>
-                                        <th title="Official Max Total">Tot_M</th>
-                                        <th onClick={() => requestSort(setStatsSortConfig, 'Max_T')} title="Achieved Top Score">Top_T <SortIcon config={statsSortConfig} columnKey="Max_T" /></th>
+                                        <th onClick={() => requestSort(setStatsSortConfig, 'Max_T')}>Max_T <SortIcon config={statsSortConfig} columnKey="Max_T" /></th>
                                         <th onClick={() => requestSort(setStatsSortConfig, 'T_250')}>T&gt;250 <SortIcon config={statsSortConfig} columnKey="T_250" /></th>
                                         <th onClick={() => requestSort(setStatsSortConfig, 'T_200')}>T&gt;200 <SortIcon config={statsSortConfig} columnKey="T_200" /></th>
                                         <th onClick={() => requestSort(setStatsSortConfig, 'T_180')}>T&gt;180 <SortIcon config={statsSortConfig} columnKey="T_180" /></th>
@@ -605,30 +606,26 @@ const AnalysisReport = ({ filters }) => {
                                         <th onClick={() => requestSort(setStatsSortConfig, 'T_120')}>T&gt;120 <SortIcon config={statsSortConfig} columnKey="T_120" /></th>
                                         <th onClick={() => requestSort(setStatsSortConfig, 'T_100')}>T&gt;100 <SortIcon config={statsSortConfig} columnKey="T_100" /></th>
                                         <th onClick={() => requestSort(setStatsSortConfig, 'T_80')}>T&gt;80 <SortIcon config={statsSortConfig} columnKey="T_80" /></th>
-                                        <th title="Official Max Math">M_Max</th>
-                                        <th onClick={() => requestSort(setStatsSortConfig, 'Max_M')}>Top_M <SortIcon config={statsSortConfig} columnKey="Max_M" /></th>
+                                        <th onClick={() => requestSort(setStatsSortConfig, 'Max_M')}>Max_M <SortIcon config={statsSortConfig} columnKey="Max_M" /></th>
                                         <th onClick={() => requestSort(setStatsSortConfig, 'M_80')}>M&gt;80 <SortIcon config={statsSortConfig} columnKey="M_80" /></th>
                                         <th onClick={() => requestSort(setStatsSortConfig, 'M_70')}>M&gt;70 <SortIcon config={statsSortConfig} columnKey="M_70" /></th>
-                                        <th title="Official Max Physics">P_Max</th>
-                                        <th onClick={() => requestSort(setStatsSortConfig, 'Max_P')}>Top_P <SortIcon config={statsSortConfig} columnKey="Max_P" /></th>
+                                        <th onClick={() => requestSort(setStatsSortConfig, 'Max_P')}>Max_P <SortIcon config={statsSortConfig} columnKey="Max_P" /></th>
                                         <th onClick={() => requestSort(setStatsSortConfig, 'P_80')}>P&gt;80 <SortIcon config={statsSortConfig} columnKey="P_80" /></th>
                                         <th onClick={() => requestSort(setStatsSortConfig, 'P_70')}>P&gt;70 <SortIcon config={statsSortConfig} columnKey="P_70" /></th>
-                                        <th title="Official Max Chemistry">C_Max</th>
-                                        <th onClick={() => requestSort(setStatsSortConfig, 'Max_C')}>Top_C <SortIcon config={statsSortConfig} columnKey="Max_C" /></th>
+                                        <th onClick={() => requestSort(setStatsSortConfig, 'Max_C')}>Max_C <SortIcon config={statsSortConfig} columnKey="Max_C" /></th>
                                         <th onClick={() => requestSort(setStatsSortConfig, 'C_80')}>C&gt;80 <SortIcon config={statsSortConfig} columnKey="C_80" /></th>
                                         <th onClick={() => requestSort(setStatsSortConfig, 'C_70')}>C&gt;70 <SortIcon config={statsSortConfig} columnKey="C_70" /></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {loading ? (
-                                        <tr><td colSpan="21" className="text-center py-4" style={{ color: '#64748b' }}>Loading statistics...</td></tr>
+                                        <tr><td colSpan="20" className="text-center py-4" style={{ color: '#64748b' }}>Loading statistics...</td></tr>
                                     ) : (
                                         sortedExamStats.map((row, i) => (
                                             <tr key={i}>
                                                 <td className="text-left">{formatDate(row.DATE)}</td>
                                                 <td className="text-left" style={{ whiteSpace: 'nowrap' }}>{row.Test}</td>
                                                 <td style={{ fontWeight: '700' }}>{row.Attn}</td>
-                                                <td style={{ color: '#0369a1', fontWeight: 'bold' }}>{row.Official_Max_T}</td>
                                                 <td>{row.Max_T}</td>
                                                 <td>{row.T_250}</td>
                                                 <td>{row.T_200}</td>
@@ -637,15 +634,12 @@ const AnalysisReport = ({ filters }) => {
                                                 <td>{row.T_120}</td>
                                                 <td>{row.T_100}</td>
                                                 <td>{row.T_80}</td>
-                                                <td style={{ color: '#0369a1', fontWeight: 'bold' }}>{row.Official_Max_M}</td>
                                                 <td>{row.Max_M}</td>
                                                 <td>{row.M_80}</td>
                                                 <td>{row.M_70}</td>
-                                                <td style={{ color: '#0369a1', fontWeight: 'bold' }}>{row.Official_Max_P}</td>
                                                 <td>{row.Max_P}</td>
                                                 <td>{row.P_80}</td>
                                                 <td>{row.P_70}</td>
-                                                <td style={{ color: '#0369a1', fontWeight: 'bold' }}>{row.Official_Max_C}</td>
                                                 <td>{row.Max_C}</td>
                                                 <td>{row.C_80}</td>
                                                 <td>{row.C_70}</td>
@@ -656,7 +650,6 @@ const AnalysisReport = ({ filters }) => {
                                         <tr className="total-row" style={{ backgroundColor: '#FFF2CC', color: 'black', fontWeight: 'bold' }}>
                                             <td colSpan="2" className="text-left">Average Count</td>
                                             <td style={{ fontWeight: '700' }}>{statsSummary.Attn}</td>
-                                            <td style={{ color: '#0369a1' }}>{statsSummary.Official_Max_T}</td>
                                             <td>{statsSummary.Max_T}</td>
                                             <td>{statsSummary.T_250}</td>
                                             <td>{statsSummary.T_200}</td>
@@ -665,15 +658,12 @@ const AnalysisReport = ({ filters }) => {
                                             <td>{statsSummary.T_120}</td>
                                             <td>{statsSummary.T_100}</td>
                                             <td>{statsSummary.T_80}</td>
-                                            <td style={{ color: '#0369a1' }}>{statsSummary.Official_Max_M}</td>
                                             <td>{statsSummary.Max_M}</td>
                                             <td>{statsSummary.M_80}</td>
                                             <td>{statsSummary.M_70}</td>
-                                            <td style={{ color: '#0369a1' }}>{statsSummary.Official_Max_P}</td>
                                             <td>{statsSummary.Max_P}</td>
                                             <td>{statsSummary.P_80}</td>
                                             <td>{statsSummary.P_70}</td>
-                                            <td style={{ color: '#0369a1' }}>{statsSummary.Official_Max_C}</td>
                                             <td>{statsSummary.Max_C}</td>
                                             <td>{statsSummary.C_80}</td>
                                             <td>{statsSummary.C_70}</td>
@@ -696,13 +686,21 @@ const AnalysisReport = ({ filters }) => {
                                         <th className="w-id-col" onClick={() => requestSort(setMeritSortConfig, 'STUD_ID')}>ID <SortIcon config={meritSortConfig} columnKey="STUD_ID" /></th>
                                         <th className="w-name-col" onClick={() => requestSort(setMeritSortConfig, 'name')}>Name <SortIcon config={meritSortConfig} columnKey="name" /></th>
                                         <th className="w-campus-col" onClick={() => requestSort(setMeritSortConfig, 'campus')}>Campus <SortIcon config={meritSortConfig} columnKey="campus" /></th>
-                                        <th className="col-yellow w-marks-col" onClick={() => requestSort(setMeritSortConfig, 'tot')}>TOT<br />{Math.round(studentMarks[0]?.max_tot || 300)} <SortIcon config={meritSortConfig} columnKey="tot" /></th>
+                                        <th className="col-yellow w-marks-col" onClick={() => requestSort(setMeritSortConfig, 'tot')}>
+                                            TOT{examStats.length === 1 && studentMarks[0]?.max_tot && <><br />{Math.round(studentMarks[0].max_tot)}</>} <SortIcon config={meritSortConfig} columnKey="tot" />
+                                        </th>
                                         <th className="col-yellow w-marks-col" onClick={() => requestSort(setMeritSortConfig, 'air')}>AIR <SortIcon config={meritSortConfig} columnKey="air" /></th>
-                                        <th className="col-green w-marks-col" onClick={() => requestSort(setMeritSortConfig, 'mat')}>MAT<br />{Math.round(studentMarks[0]?.max_mat || 100)} <SortIcon config={meritSortConfig} columnKey="mat" /></th>
+                                        <th className="col-green w-marks-col" onClick={() => requestSort(setMeritSortConfig, 'mat')}>
+                                            MAT{examStats.length === 1 && studentMarks[0]?.max_mat && <><br />{Math.round(studentMarks[0].max_mat)}</>} <SortIcon config={meritSortConfig} columnKey="mat" />
+                                        </th>
                                         <th className="col-green w-marks-col" onClick={() => requestSort(setMeritSortConfig, 'm_rank')}>RANK <SortIcon config={meritSortConfig} columnKey="m_rank" /></th>
-                                        <th className="col-green-pale w-marks-col" onClick={() => requestSort(setMeritSortConfig, 'phy')}>PHY<br />{Math.round(studentMarks[0]?.max_phy || 100)} <SortIcon config={meritSortConfig} columnKey="phy" /></th>
+                                        <th className="col-green-pale w-marks-col" onClick={() => requestSort(setMeritSortConfig, 'phy')}>
+                                            PHY{examStats.length === 1 && studentMarks[0]?.max_phy && <><br />{Math.round(studentMarks[0].max_phy)}</>} <SortIcon config={meritSortConfig} columnKey="phy" />
+                                        </th>
                                         <th className="col-green-pale w-marks-col" onClick={() => requestSort(setMeritSortConfig, 'p_rank')}>RANK <SortIcon config={meritSortConfig} columnKey="p_rank" /></th>
-                                        <th className="col-pink-pale w-marks-col" onClick={() => requestSort(setMeritSortConfig, 'che')}>CHE<br />{Math.round(studentMarks[0]?.max_che || 100)} <SortIcon config={meritSortConfig} columnKey="che" /></th>
+                                        <th className="col-pink-pale w-marks-col" onClick={() => requestSort(setMeritSortConfig, 'che')}>
+                                            CHE{examStats.length === 1 && studentMarks[0]?.max_che && <><br />{Math.round(studentMarks[0].max_che)}</>} <SortIcon config={meritSortConfig} columnKey="che" />
+                                        </th>
                                         <th className="col-pink-pale w-marks-col" onClick={() => requestSort(setMeritSortConfig, 'c_rank')}>RANK <SortIcon config={meritSortConfig} columnKey="c_rank" /></th>
                                         <th className="col-exams w-marks-col" onClick={() => requestSort(setMeritSortConfig, 't_app')}>EXAMS <SortIcon config={meritSortConfig} columnKey="t_app" /></th>
                                     </tr>
