@@ -136,6 +136,48 @@ async function processFile(filePath) {
         });
 }
 
+const KARNATAKA_PREFIXES = [
+    'BEN/', 'BAN/', 'SAR/', 'BLR/', 'HUB/', 'DAV/', 'MYS/', 'TUM/',
+    'BEL/', 'BAL/', 'MANG/', 'MNG/', 'MAN/'
+];
+
+function cleanCampusName(name) {
+    if (!name) return "";
+    let upper = name.toUpperCase().trim();
+    const matchedPrefix = KARNATAKA_PREFIXES.find(p => upper.startsWith(p));
+
+    let branch = "";
+    if (matchedPrefix) {
+        branch = upper.substring(matchedPrefix.length).trim();
+    } else {
+        branch = upper.includes('/') ? upper.split('/')[1] : upper;
+    }
+
+    branch = branch.replace(/PU COLLEGE\s+/i, '');
+    branch = branch.replace(/PUC\s+/i, '');
+    branch = branch.replace(/MARTHAHALLY/i, 'MARTHAHALLI');
+
+    return branch.trim();
+}
+
+const KARNATAKA_CITIES = [
+    'BANGALORE', 'HUBLI', 'DAVANAGERE', 'MYSORE', 'TUMKUR',
+    'BELAGAVI', 'BALLARI', 'MANGALORE', 'MANDYA', 'MARTHAHALLI'
+];
+
+function isKarnatakaCampus(name) {
+    if (!name) return false;
+    const upper = name.toUpperCase().trim();
+
+    // 1. Prefix matches
+    if (KARNATAKA_PREFIXES.some(prefix => upper.startsWith(prefix))) return true;
+
+    // 2. Already cleaned city matches
+    if (KARNATAKA_CITIES.some(city => upper.includes(city))) return true;
+
+    return false;
+}
+
 async function uploadToDB(rows, tableName, filename) {
     let pool;
     try {
@@ -164,6 +206,7 @@ async function uploadToDB(rows, tableName, filename) {
 
         let successCount = 0;
         let failCount = 0;
+        let skipCount = 0;
 
         // Basic Validation
         const firstRow = rows[0];
@@ -174,15 +217,14 @@ async function uploadToDB(rows, tableName, filename) {
             return;
         }
 
-        const BATCH_SIZE = 50; // Upload in batches to save RUs
+        const BATCH_SIZE = 50;
 
         for (let i = startIndex; i < rows.length; i += BATCH_SIZE) {
             const batchRows = rows.slice(i, i + BATCH_SIZE);
             const batchInserts = [];
             const checkConditions = [];
-            let safeKeysStr = ""; // Store one instance of keys for the INSERT statement
+            let safeKeysStr = "";
 
-            // 1. Process Data & Prepare Checks
             for (const row of batchRows) {
                 const keys = Object.keys(row);
                 if (!safeKeysStr) safeKeysStr = keys.map(k => `\`${k.trim()}\``).join(',');
@@ -190,52 +232,51 @@ async function uploadToDB(rows, tableName, filename) {
                 const findKeyIndex = (name) => keys.findIndex(k => k.trim().toUpperCase() === name);
                 const studIdIndex = findKeyIndex('STUD_ID');
                 const testIndex = findKeyIndex('TEST');
-                // No Q_No in Medical Result usually, just Test based
+                const campusIndex = findKeyIndex('CAMPUS_NAME');
 
-                // --- DATA CLEANING & FORMATTING ---
+                // --- CAMPUS FILTERING ---
+                if (campusIndex !== -1) {
+                    const campusRaw = String(row[keys[campusIndex]]).trim();
+                    if (!isKarnatakaCampus(campusRaw)) {
+                        skipCount++;
+                        continue; // Skip non-Karnataka records
+                    }
+                }
+
                 const values = Object.values(row).map((v, index) => {
                     const key = keys[index];
                     const upperKey = key.toUpperCase().trim();
                     if (v === null || v === undefined) return "NULL";
                     let s = String(v).trim();
 
-                    // 1. Handle Numeric Columns (Prevent "Incorrect value" errors)
+                    // 0. Clean CAMPUS_NAME
+                    if (upperKey === 'CAMPUS_NAME') {
+                        s = cleanCampusName(s);
+                    }
+
+                    // 1. Handle Numeric Columns
                     const numericColumns = ['TOTAL', 'TOTAL_PER', 'AIR', 'MAT', 'MAT_PER', 'M_RANK', 'PHY', 'PHY_PER', 'P_RANK', 'CHE', 'CHE_PER', 'C_RANK'];
                     if (numericColumns.includes(upperKey)) {
-                        // If value is not a valid number (e.g., '?', '-', 'Nil', ''), set to NULL
-                        if (s === '' || isNaN(Number(s)) || s === '?') {
-                            return "NULL";
-                        }
+                        if (s === '' || isNaN(Number(s)) || s === '?') return "NULL";
                     }
 
-                    // 2. Format STUD_ID (Remove scientific notation)
+                    // 2. Format STUD_ID
                     if (upperKey === 'STUD_ID') {
                         if (/[eE][+-]?\d+$/.test(s) || /^\d+\.\d+$/.test(s)) {
-                            try {
-                                const n = Number(s);
-                                if (!isNaN(n)) s = n.toLocaleString('fullwide', { useGrouping: false });
-                            } catch (e) { }
+                            try { const n = Number(s); if (!isNaN(n)) s = n.toLocaleString('fullwide', { useGrouping: false }); } catch (e) { }
                         }
                     }
 
-                    // 3. Format DATE (TiDB/MySQL requires YYYY-MM-DD)
+                    // 3. Format DATE
                     if (upperKey === 'DATE' || upperKey === 'EXAM_DATE') {
                         let dateObj = null;
-                        // Case A: Excel Serial Number (e.g. 45831)
                         if (/^\d{5}(\.\d+)?$/.test(s)) {
-                            try {
-                                const serial = parseFloat(s);
-                                dateObj = new Date(Math.round((serial - 25569) * 86400 * 1000));
-                            } catch (e) { }
+                            try { const serial = parseFloat(s); dateObj = new Date(Math.round((serial - 25569) * 86400 * 1000)); } catch (e) { }
                         }
-                        // Case B: DD/MM/YYYY or DD-MM-YYYY
                         else if (s.includes('/') || s.includes('-')) {
                             const sep = s.includes('/') ? '/' : '-';
                             const parts = s.split(sep);
-                            if (parts.length === 3) {
-                                // Assuming DD is parts[0], MM is parts[1], YYYY is parts[2]
-                                dateObj = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-                            }
+                            if (parts.length === 3) dateObj = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
                         }
 
                         if (dateObj && !isNaN(dateObj.getTime())) {
@@ -257,7 +298,6 @@ async function uploadToDB(rows, tableName, filename) {
                 if (studIdVal) {
                     let clause = `(STUD_ID = ${studIdVal}`;
                     if (testVal) clause += ` AND Test = ${testVal}`;
-                    // Unique Logic: STUD_ID + Test is unique for Engineering Result
                     clause += `)`;
                     checkConditions.push(clause);
                 }
@@ -339,6 +379,7 @@ async function uploadToDB(rows, tableName, filename) {
         }
         console.log(`\n\n✅ Upload Complete!`);
         console.log(`Success: ${successCount}`);
+        console.log(`Skipped: ${skipCount} (Non-Karnataka campuses)`);
         console.log(`Failed:  ${failCount} (Likely duplicates or data errors)`);
 
         // Clear checkpoint on completion

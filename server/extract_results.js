@@ -78,13 +78,37 @@ function findResultFiles(dir) {
     return results;
 }
 
+const KARNATAKA_PREFIXES = [
+    'BEN/', 'BAN/', 'SAR/', 'BLR/', 'HUB/', 'DAV/', 'MYS/', 'TUM/',
+    'BEL/', 'BAL/', 'MANG/', 'MNG/', 'MAN/'
+];
+
+// Fallback for names already cleaned or clearly in major Karnataka cities
+const KARNATAKA_CITIES = [
+    'BANGALORE', 'HUBLI', 'DAVANAGERE', 'MYSORE', 'TUMKUR',
+    'BELAGAVI', 'BALLARI', 'MANGALORE', 'MANDYA', 'MARTHAHALLI'
+];
+
 function cleanCampusName(name) {
     if (!name) return "";
-    let cleaned = name.includes('/') ? name.split('/')[1] : name;
-    cleaned = cleaned.replace(/PU COLLEGE\s+/i, '');
-    cleaned = cleaned.replace(/PUC\s+/i, '');
-    cleaned = cleaned.replace(/MARTHAHALLY/i, 'MARTHAHALLI');
-    return cleaned.trim();
+    let upper = name.toUpperCase().trim();
+
+    // Check if it starts with any of our allowed prefixes
+    const matchedPrefix = KARNATAKA_PREFIXES.find(p => upper.startsWith(p));
+
+    let branch = "";
+    if (matchedPrefix) {
+        branch = upper.substring(matchedPrefix.length).trim();
+    } else {
+        branch = upper.includes('/') ? upper.split('/')[1] : upper;
+    }
+
+    // Clean the branch name
+    branch = branch.replace(/PU COLLEGE\s+/i, '');
+    branch = branch.replace(/PUC\s+/i, '');
+    branch = branch.replace(/MARTHAHALLY/i, 'MARTHAHALLI');
+
+    return branch.trim();
 }
 
 function isKarnatakaCampus(name, allowedCampuses) {
@@ -94,14 +118,13 @@ function isKarnatakaCampus(name, allowedCampuses) {
     // 1. Check if explicitly allowed in Uploader_Config.xlsx
     if (allowedCampuses && allowedCampuses.has(upper)) return true;
 
-    // 2. Check by known Karnataka/Bangalore prefixes
-    const keywords = [
-        'BEN/', 'BAN/', 'SAR/', 'HUB/', 'DAV/', 'MYS/', 'TUM/',
-        'BEL/', 'BAL/', 'MANG/', 'KAR/', 'MAN/', 'BID/', 'KOL/',
-        'BAG/', 'GAD/', 'DHAD/', 'HASS/', 'CHI/', 'CHIT/', 'RAI/',
-        'BIJ/', 'KOP/', 'YAD/', 'UDU/', 'KOD/', 'HAW/'
-    ];
-    return keywords.some(k => upper.includes(k));
+    // 2. Check by exact prefixes
+    if (KARNATAKA_PREFIXES.some(prefix => upper.startsWith(prefix))) return true;
+
+    // 3. Check by known city names (for already cleaned data)
+    if (KARNATAKA_CITIES.some(city => upper.includes(city))) return true;
+
+    return false;
 }
 
 async function processResultFile(filePath, pool, topIds, allowedCampuses, processedGroups) {
@@ -145,7 +168,14 @@ async function processResultFile(filePath, pool, topIds, allowedCampuses, proces
 
             if (s.includes('Prog Name:') && !batch) {
                 const match = s.match(/Prog Name:\s*(.*)/);
-                if (match) batch = match[1].trim();
+                if (match) {
+                    let extracted = match[1].trim();
+                    // Remove "Inc " prefix if present (case-insensitive)
+                    if (extracted.toUpperCase().startsWith("INC ")) {
+                        extracted = extracted.substring(4).trim();
+                    }
+                    batch = extracted;
+                }
             }
             if (s.includes('Test Date:') && !dateStr) {
                 const match = s.match(/Test Date:\s*(.*)/);
@@ -254,14 +284,26 @@ async function processResultFile(filePath, pool, topIds, allowedCampuses, proces
     colMap.PHY_RANK = findRankAfter(colMap.PHY);
     colMap.CHE_RANK = findRankAfter(colMap.CHE);
 
-    // EXTRACT MAX MARKS from Row 9 (hRow9)
-    const maxMarks = {
-        tot: parseNum(hRow9[colMap.TOT]),
-        mat: parseNum(hRow9[colMap.MAT]),
-        phy: parseNum(hRow9[colMap.PHY]),
-        che: parseNum(hRow9[colMap.CHE])
-    };
-    console.log(`  Extracted Max Marks: TOT=${maxMarks.tot}, MAT=${maxMarks.mat}, PHY=${maxMarks.phy}, CHE=${maxMarks.che}`);
+    // EXTRACT MAX MARKS from Row 9 (hRow9) - Verified if it's a Max Marks row
+    const firstStudId = String(hRow9[colMap.STUD_ID] || '').trim();
+    const isActuallyMaxRow = !firstStudId || isNaN(parseInt(firstStudId)) || parseInt(firstStudId) < 1000;
+
+    let maxMarks = { tot: 300, mat: 100, phy: 100, che: 100 }; // Default Mains
+    if (isActuallyMaxRow) {
+        maxMarks = {
+            tot: parseNum(hRow9[colMap.TOT]) || 300,
+            mat: parseNum(hRow9[colMap.MAT]) || 100,
+            phy: parseNum(hRow9[colMap.PHY]) || 100,
+            che: parseNum(hRow9[colMap.CHE]) || 100
+        };
+        console.log(`  Extracted Official Max Marks: TOT=${maxMarks.tot}, MAT=${maxMarks.mat}, PHY=${maxMarks.phy}, CHE=${maxMarks.che}`);
+    } else {
+        // If it's a student, check test name for defaults
+        if (testName.startsWith('WTA') || testName.includes('ADV')) {
+            maxMarks = { tot: 180, mat: 60, phy: 60, che: 60 };
+        }
+        console.log(`  Row after header is a Student. Using Default Max Marks for ${testName}: TOT=${maxMarks.tot}`);
+    }
 
     // LOG MISSING COLUMNS
     const missing = Object.keys(colMap).filter(k => colMap[k] === -1);
@@ -323,7 +365,7 @@ async function processResultFile(filePath, pool, topIds, allowedCampuses, proces
             Batch: batch,
             Year: '2025',
             Top_ALL: topIds.has(studIdRaw) ? 'TOP' : 'ALL',
-            P1_P2: String(row[colMap.P1_P2] || '').trim() || testName.split('-')[0].trim(), // FALLBACK: Prefix of Test Name
+            P1_P2: testName.split('-')[0].trim(), // Always use Test Prefix (WTA, WTM, etc) for Test_Type filter
             Best_of_three: String(row[colMap.BEST3] || '').trim(),
             Below_1000_Target: String(row[colMap.B1000] || '').trim(),
             Jee_Mains_Target: String(row[colMap.JMAINS] || '').trim(),
