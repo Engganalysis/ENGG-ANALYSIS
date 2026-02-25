@@ -270,7 +270,16 @@ const AverageReport = ({ filters }) => {
             currentY += 18;
         }
 
-        const tableColumn = ["Test Name", "Date", "Total\n300", "AIR", "Mat\n100", "Phy\n100", "Chem\n100"];
+        const student = studentData[0] || {};
+        const tableColumn = [
+            "Test Name",
+            "Date",
+            `Total\n(${Math.round(student.Max_Tot || 300)})`,
+            "AIR",
+            `Mat\n(${Math.round(student.Max_Mat || 100)})`,
+            `Phy\n(${Math.round(student.Max_Phy || 100)})`,
+            `Chem\n(${Math.round(student.Max_Che || 100)})`
+        ];
         const tableRows = studentData.map(row => [
             row.Test,
             formatDate(row.DATE),
@@ -531,11 +540,11 @@ const AverageReport = ({ filters }) => {
                                         <tr className="table-main-header">
                                             <th className="w-test">Test Name</th>
                                             <th className="w-date">Date</th>
-                                            <th className="w-total col-yellow">TOT<br />300</th>
+                                            <th className="w-total col-yellow">TOT<br />{Math.round(previewRows[0]?.Max_Tot || 300)}</th>
                                             <th className="w-air">AIR</th>
-                                            <th className="w-sub col-orange">MAT<br />100</th>
-                                            <th className="w-sub col-green-pale">PHY<br />100</th>
-                                            <th className="w-sub col-pink-pale">CHE<br />100</th>
+                                            <th className="w-sub col-orange">MAT<br />{Math.round(previewRows[0]?.Max_Mat || 100)}</th>
+                                            <th className="w-sub col-green-pale">PHY<br />{Math.round(previewRows[0]?.Max_Phy || 100)}</th>
+                                            <th className="w-sub col-pink-pale">CHE<br />{Math.round(previewRows[0]?.Max_Che || 100)}</th>
                                         </tr>
                                     </thead>
                                     <tbody>

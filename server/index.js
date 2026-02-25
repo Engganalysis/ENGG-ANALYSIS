@@ -349,7 +349,11 @@ app.get('/api/history', async (req, res) => {
                 NAME_OF_THE_STUDENT,
                 CAMPUS_NAME,
                 STUD_ID,
-                Batch
+                Batch,
+                Max_Tot,
+                Max_Mat,
+                Max_Phy,
+                Max_Che
             FROM ENGG_RESULT 
             ${whereClause}
             ORDER BY STR_TO_DATE(DATE, '%Y-%m-%d') ASC
@@ -437,6 +441,7 @@ app.get('/api/exam-stats', async (req, res) => {
                 TRIM(Test) as Test, 
                 COUNT(STUD_ID) as Attn,
                 MAX(CAST(Total AS DECIMAL(10,2))) as Max_T,
+                MAX(Max_Tot) as Official_Max_T,
                 SUM(CASE WHEN CAST(Total AS DECIMAL(10,2)) >= 250 THEN 1 ELSE 0 END) as T_250,
                 SUM(CASE WHEN CAST(Total AS DECIMAL(10,2)) >= 200 THEN 1 ELSE 0 END) as T_200,
                 SUM(CASE WHEN CAST(Total AS DECIMAL(10,2)) >= 180 THEN 1 ELSE 0 END) as T_180,
@@ -445,12 +450,15 @@ app.get('/api/exam-stats', async (req, res) => {
                 SUM(CASE WHEN CAST(Total AS DECIMAL(10,2)) >= 100 THEN 1 ELSE 0 END) as T_100,
                 SUM(CASE WHEN CAST(Total AS DECIMAL(10,2)) >= 80 THEN 1 ELSE 0 END) as T_80,
                 MAX(CAST(MAT AS DECIMAL(10,2))) as Max_M,
+                MAX(Max_Mat) as Official_Max_M,
                 SUM(CASE WHEN CAST(MAT AS DECIMAL(10,2)) >= 80 THEN 1 ELSE 0 END) as M_80,
                 SUM(CASE WHEN CAST(MAT AS DECIMAL(10,2)) >= 70 THEN 1 ELSE 0 END) as M_70,
                 MAX(CAST(PHY AS DECIMAL(10,2))) as Max_P,
+                MAX(Max_Phy) as Official_Max_P,
                 SUM(CASE WHEN CAST(PHY AS DECIMAL(10,2)) >= 80 THEN 1 ELSE 0 END) as P_80,
                 SUM(CASE WHEN CAST(PHY AS DECIMAL(10,2)) >= 70 THEN 1 ELSE 0 END) as P_70,
                 MAX(CAST(CHE AS DECIMAL(10,2))) as Max_C,
+                MAX(Max_Che) as Official_Max_C,
                 SUM(CASE WHEN CAST(CHE AS DECIMAL(10,2)) >= 80 THEN 1 ELSE 0 END) as C_80,
                 SUM(CASE WHEN CAST(CHE AS DECIMAL(10,2)) >= 70 THEN 1 ELSE 0 END) as C_70
             FROM ENGG_RESULT
@@ -488,7 +496,11 @@ app.get('/api/analysis-report', async (req, res) => {
                 AVG(CAST(P_Rank as DECIMAL(10,2))) as p_rank,
                 AVG(CAST(CHE as DECIMAL(10,2))) as che,
                 AVG(CAST(C_Rank as DECIMAL(10,2))) as c_rank,
-                COUNT(Test) as t_app
+                COUNT(Test) as t_app,
+                AVG(Max_Tot) as max_tot,
+                AVG(Max_Mat) as max_mat,
+                AVG(Max_Phy) as max_phy,
+                AVG(Max_Che) as max_che
             FROM ENGG_RESULT
             ${where}
             GROUP BY STUD_ID

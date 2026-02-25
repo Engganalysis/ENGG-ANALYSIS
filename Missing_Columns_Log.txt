@@ -1,5 +1,5 @@
-=== UPLOADER LOG: 2/24/2026, 3:35:16 PM ===
+=== UPLOADER LOG: 2/25/2026, 10:31:59 AM ===
 
-FILE: 1_06-Sep-25_Jr.C-120_Jee-Main_WTM-11_All_India_Marks_Analysis.xlsx
-MISSING COLUMNS: P1_P2, BEST3, B1000, JMAINS
+FILE: 1_15-Jun-25_Jr.C-120_Jee-Adv_WTA-02_All_India_Marks_Analysis.xlsx
+MISSING COLUMNS: BEST3, B1000, JMAINS
 -----------------------------------

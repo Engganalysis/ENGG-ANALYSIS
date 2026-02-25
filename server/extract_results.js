@@ -107,7 +107,24 @@ function isKarnatakaCampus(name, allowedCampuses) {
 async function processResultFile(filePath, pool, topIds, allowedCampuses, processedGroups) {
     const wb = XLSX.readFile(filePath);
     // Find the right sheet. Usually the last one or named like Main(Micro) or All-India...
-    const sheetName = wb.SheetNames.find(s => s.includes('Main') || s.includes('All-India')) || wb.SheetNames[0];
+    let sheetName = wb.SheetNames.find(s => s.includes('Main') || s.includes('All-India') || s.includes('Micro') || s.includes('Adv'));
+
+    // If no obvious match, look for a sheet that contains 'STUD_ID' in the first 20 rows
+    if (!sheetName) {
+        for (const name of wb.SheetNames) {
+            const ws = wb.Sheets[name];
+            const rows = XLSX.utils.sheet_to_json(ws, { header: 1, range: 0, defval: "" });
+            const found = rows.slice(0, 20).some(row => row.some(cell => String(cell).includes('STUD_ID') || String(cell).includes('STUD ID')));
+            if (found) {
+                sheetName = name;
+                break;
+            }
+        }
+    }
+
+    if (!sheetName) sheetName = wb.SheetNames[0];
+
+    console.log(`  Using Sheet: [${sheetName}]`);
     const ws = wb.Sheets[sheetName];
     const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
 
@@ -152,8 +169,14 @@ async function processResultFile(filePath, pool, topIds, allowedCampuses, proces
             }
         });
 
-        if (row.includes('STUD_ID')) {
+        const isHeader = row.some(cell => {
+            const s = String(cell || '').trim();
+            return s === 'STUD_ID' || s === 'STUD ID' || (s.includes('STUDENT') && s.includes('NAME'));
+        });
+
+        if (isHeader) {
             headerRowIdx = i;
+            break; // Stop at first header row found
         }
     }
 
@@ -231,6 +254,15 @@ async function processResultFile(filePath, pool, topIds, allowedCampuses, proces
     colMap.PHY_RANK = findRankAfter(colMap.PHY);
     colMap.CHE_RANK = findRankAfter(colMap.CHE);
 
+    // EXTRACT MAX MARKS from Row 9 (hRow9)
+    const maxMarks = {
+        tot: parseNum(hRow9[colMap.TOT]),
+        mat: parseNum(hRow9[colMap.MAT]),
+        phy: parseNum(hRow9[colMap.PHY]),
+        che: parseNum(hRow9[colMap.CHE])
+    };
+    console.log(`  Extracted Max Marks: TOT=${maxMarks.tot}, MAT=${maxMarks.mat}, PHY=${maxMarks.phy}, CHE=${maxMarks.che}`);
+
     // LOG MISSING COLUMNS
     const missing = Object.keys(colMap).filter(k => colMap[k] === -1);
     // Ignore optional columns in "essential" check for notification
@@ -294,7 +326,11 @@ async function processResultFile(filePath, pool, topIds, allowedCampuses, proces
             P1_P2: String(row[colMap.P1_P2] || '').trim() || testName.split('-')[0].trim(), // FALLBACK: Prefix of Test Name
             Best_of_three: String(row[colMap.BEST3] || '').trim(),
             Below_1000_Target: String(row[colMap.B1000] || '').trim(),
-            Jee_Mains_Target: String(row[colMap.JMAINS] || '').trim()
+            Jee_Mains_Target: String(row[colMap.JMAINS] || '').trim(),
+            Max_Tot: maxMarks.tot,
+            Max_Mat: maxMarks.mat,
+            Max_Phy: maxMarks.phy,
+            Max_Che: maxMarks.che
         };
 
         studentsToUpload.push(student);
@@ -325,7 +361,8 @@ async function processResultFile(filePath, pool, topIds, allowedCampuses, proces
                     s.Total, s.Total_Per, s.AIR, s.MAT, s.MAT_Per, s.M_Rank,
                     s.PHY, s.PHY_Per, s.P_Rank, s.CHE, s.CHE_Per, s.C_Rank,
                     s.Batch, s.Year, s.Top_ALL, s.P1_P2, s.Best_of_three,
-                    s.Below_1000_Target, s.Jee_Mains_Target
+                    s.Below_1000_Target, s.Jee_Mains_Target,
+                    s.Max_Tot, s.Max_Mat, s.Max_Phy, s.Max_Che
                 ].map(v => v === null || v === undefined ? 'NULL' : `'${String(v).replace(/'/g, "''")}'`);
                 return `(${cols.join(',')})`;
             }).join(',');
@@ -335,7 +372,8 @@ async function processResultFile(filePath, pool, topIds, allowedCampuses, proces
                 Total, Total_Per, AIR, MAT, MAT_Per, M_Rank,
                 PHY, PHY_Per, P_Rank, CHE, CHE_Per, C_Rank,
                 Batch, Year, Top_ALL, P1_P2, Best_of_three,
-                Below_1000_Target, Jee_Mains_Target
+                Below_1000_Target, Jee_Mains_Target,
+                Max_Tot, Max_Mat, Max_Phy, Max_Che
             ) VALUES ${values}`;
 
             await pool.request().query(sql);

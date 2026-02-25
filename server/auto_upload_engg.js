@@ -93,7 +93,11 @@ async function processFile(filePath) {
                         P1_P2 VARCHAR(50),
                         Best_of_three VARCHAR(50),
                         Below_1000_Target VARCHAR(50),
-                        Jee_Mains_Target VARCHAR(50)
+                        Jee_Mains_Target VARCHAR(50),
+                        Max_Tot INT,
+                        Max_Mat INT,
+                        Max_Phy INT,
+                        Max_Che INT
                     ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
                 `;
                 await pool.request().query(createTableSql);
