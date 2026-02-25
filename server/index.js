@@ -412,7 +412,7 @@ app.get('/api/studentsByCampus', async (req, res) => {
                 TRIM(STUD_ID) as id, 
                 MAX(TRIM(NAME_OF_THE_STUDENT)) as name,
                 MAX(TRIM(CAMPUS_NAME)) as campus,
-                MAX(TRIM(Batch)) as stream
+                GROUP_CONCAT(DISTINCT TRIM(Batch) SEPARATOR ',') as stream
             FROM ENGG_RESULT 
             ${where} 
             GROUP BY STUD_ID

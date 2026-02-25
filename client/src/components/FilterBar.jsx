@@ -341,11 +341,8 @@ const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} })
                                     studentSearch: [opt.value],
                                     quickSearch: opt.label, // Keep the label for display
                                     // Auto-select Campus and Stream IF NOT RESTRICTED
-                                    studentSearch: [opt.value],
-                                    quickSearch: opt.label, // Keep the label for display
-                                    // Auto-select Campus and Stream IF NOT RESTRICTED
                                     campus: isRestricted && allowedCampuses.length === 1 ? [allowedCampuses[0]] : (opt.campus ? [opt.campus] : []),
-                                    stream: opt.stream ? [opt.stream] : [],
+                                    stream: opt.stream ? opt.stream.split(',') : [],
                                     testType: [], test: [], topAll: []
                                 }));
                             } else {

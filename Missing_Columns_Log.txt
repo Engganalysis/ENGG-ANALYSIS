@@ -1,5 +1,0 @@
-=== UPLOADER LOG: 2/25/2026, 12:39:24 PM ===
-
-FILE: 30-Aug-25_Sr.C-120_Jee-Main_WTM-47_All_India_Marks_Analysis.xlsx
-MISSING COLUMNS: P1_P2, BEST3, B1000, JMAINS
------------------------------------
