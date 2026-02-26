@@ -68,47 +68,39 @@ async function processFile(filePath) {
                 console.log("⚠️ Table 'ERP_REPORT_ENGG' not found. Creating it...");
                 const createTableSql = `
                     CREATE TABLE ERP_REPORT_ENGG (
-                        STUD_ID VARCHAR(255),
-                        Student_Name VARCHAR(255),
-                        Branch VARCHAR(255),
+                        STUD_ID INT,
+                        Student_Name TEXT,
+                        Branch TEXT,
                         Exam_Date DATE,
-                        Test_Type VARCHAR(100),
-                        Test VARCHAR(255),
-                        TOT VARCHAR(50),
-                        TOT_P VARCHAR(50),
-                        AIR VARCHAR(50),
-                        MAT VARCHAR(50),
-                        MAT_R VARCHAR(50),
-                        MAT_P VARCHAR(50),
-                        PHY VARCHAR(50),
-                        PHY_R VARCHAR(50),
-                        PHY_P VARCHAR(50),
-                        CHE VARCHAR(50),
-                        CHE_R VARCHAR(50),
-                        CHE_P VARCHAR(50),
+                        Test_Type TEXT,
+                        Test TEXT,
+                        TOT TEXT,
+                        TOT_P TEXT,
+                        AIR TEXT,
+                        MAT TEXT,
+                        MAT_R TEXT,
+                        MAT_P TEXT,
+                        PHY TEXT,
+                        PHY_R TEXT,
+                        PHY_P TEXT,
+                        CHE TEXT,
+                        CHE_R TEXT,
+                        CHE_P TEXT,
                         Q_No INT,
-                        W_U VARCHAR(50),
+                        W_U TEXT,
                         Q_URL TEXT,
                         S_URL TEXT,
-                        Key_Value VARCHAR(50),
-                        Subject VARCHAR(100),
-                        Topic VARCHAR(255),
-                        Sub_Topics VARCHAR(255),
-                        Question_Type VARCHAR(50),
-                        Sources VARCHAR(255),
-                        Original_Replica VARCHAR(255),
-                        Level VARCHAR(50),
-                        Batch VARCHAR(255),
-                        Year VARCHAR(50),
-                        Top_AIR VARCHAR(50),
-                        P1_P2 VARCHAR(50),
-                        Tot_720 VARCHAR(50),
-                        T_100 VARCHAR(50),
-                        T_200 VARCHAR(50),
-                        T_300 VARCHAR(50),
-                        T_400 VARCHAR(50),
-                        T_500 VARCHAR(50),
-                        T_600 VARCHAR(50)
+                        Key_Value TEXT,
+                        Subject TEXT,
+                        Topic TEXT,
+                        Sub_Topics TEXT,
+                        Question_Type TEXT,
+                        Sources TEXT,
+                        Original_Replica TEXT,
+                        Level TEXT,
+                        Year TEXT,
+                        Top_ALL TEXT,
+                        P1_P2 TEXT
                     ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
                 `;
                 await pool.request().query(createTableSql);
@@ -222,22 +214,23 @@ async function uploadToDB(rows, tableName, filename) {
                                 const d = date.getDate();
                                 const m = date.getMonth() + 1;
                                 const y = date.getFullYear();
-                                s = `${String(d).padStart(2, '0')}-${String(m).padStart(2, '0')}-${y}`;
+                                s = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                             } catch (e) { console.error("Date Parse Error:", e); }
                         }
                         // Case B: Slash Separated (DD/MM/YYYY)
                         else if (s.includes('/')) {
                             const parts = s.split('/');
                             if (parts.length === 3) {
-                                // Assuming DD/MM/YYYY
-                                s = `${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}-${parts[2]}`;
+                                // Assuming DD/MM/YYYY -> YYYY-MM-DD
+                                s = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
                             }
                         }
-                        // Case C: Hyphen Separated (DD-MM-YYYY) - already correct usually, but ensure padding
+                        // Case C: Hyphen Separated (DD-MM-YYYY)
                         else if (s.includes('-')) {
                             const parts = s.split('-');
                             if (parts.length === 3) {
-                                s = `${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}-${parts[2]}`;
+                                // Assume DD-MM-YYYY -> YYYY-MM-DD
+                                s = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
                             }
                         }
                     }

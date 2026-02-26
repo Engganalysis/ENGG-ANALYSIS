@@ -71,8 +71,11 @@ function findResultFiles(dir) {
         const stat = fs.statSync(fullPath);
         if (stat.isDirectory()) {
             results = results.concat(findResultFiles(fullPath));
-        } else if (file.toUpperCase().includes('ALL_INDIA_MARKS_ANALYSIS') && file.endsWith('.xlsx') && !file.startsWith('~$')) {
-            results.push(fullPath);
+        } else {
+            const normalized = file.toUpperCase().replace(/_/g, ' ');
+            if (normalized.includes('ALL INDIA MARKS ANALYSIS') && file.endsWith('.xlsx') && !file.startsWith('~$')) {
+                results.push(fullPath);
+            }
         }
     });
     return results;
@@ -85,13 +88,25 @@ const KARNATAKA_PREFIXES = [
 
 // Fallback for names already cleaned or clearly in major Karnataka cities
 const KARNATAKA_CITIES = [
-    'BANGALORE', 'HUBLI', 'DAVANAGERE', 'MYSORE', 'TUMKUR',
-    'BELAGAVI', 'BALLARI', 'MANGALORE', 'MANDYA', 'MARTHAHALLI'
+    'BALLARI', 'BALLARI 2', 'BALLARI BOYS', 'BALLARI GIRLS',
+    'BANASWADI', 'BANASWADI-SCHOOL', 'BANNERGHATTA ROAD', 'BELAGAVI',
+    'DAVANAGERE', 'DAVANAGERE 2', 'DR BS RAO VIDYASOUDHA MYSORE',
+    'ECITY NEET BOYS', 'ELECTRONIC CITY', 'ELECTRONIC CITY DS',
+    'HEGDENAGAR', 'HORAMAVU', 'HUBLI', 'HUBLI 2',
+    'J P NAGAR', 'J P NAGAR-SCHOOL', 'KAGGADASPURA', 'KANAKAPURA ROAD',
+    'KORAMANGALA', 'KR PURAM', 'KUDLU', 'MANDYA', 'MANGALORE',
+    'MARTHAHALLI', 'MARTHAHALLI C-120', 'MYSORE', 'NAGARBHAVI',
+    'PEENYA DASARAHALLI', 'RAJAJI NAGAR', 'RAJAJI NAGAR-SCHOOL',
+    'SARJAPURA', 'SESHADRIPURAM', 'TUMKUR', 'UTTARAHALLI',
+    'VIDYARANYAPURA', 'YESHWANTHPUR', 'BANGALORE'
 ];
 
 function cleanCampusName(name) {
     if (!name) return "";
     let upper = name.toUpperCase().trim();
+
+    // Specific case for Marthahalli variants
+    if (upper.includes('MARTHAHALLY')) upper = upper.replace('MARTHAHALLY', 'MARTHAHALLI');
 
     // Check if it starts with any of our allowed prefixes
     const matchedPrefix = KARNATAKA_PREFIXES.find(p => upper.startsWith(p));
@@ -109,6 +124,43 @@ function cleanCampusName(name) {
     branch = branch.replace(/MARTHAHALLY/i, 'MARTHAHALLI');
 
     return branch.trim();
+}
+
+function parseType2Header(header) {
+    // Expected: 28-Sep-25_Sr.Super-60_(Nucleus)_Jee Adv_RPTA-12 & CTA-09_All India_Marks_Analysis
+    const parts = header.split('_');
+    if (parts.length < 4) return null;
+
+    const dateStr = parts[0];
+    const allIndiaIdx = parts.findIndex(p => {
+        const s = p.toUpperCase().replace(/_/g, ' ');
+        return s.includes("ALL INDIA");
+    });
+    if (allIndiaIdx === -1) return null;
+
+    const testPart = parts[allIndiaIdx - 1];
+    const batchPart = parts.slice(1, allIndiaIdx - 1).join('_');
+
+    // Transformation: Sr.Super-60_(Nucleus)_Jee Adv -> Sr.Super-60(N_Adv)
+    let transformedBatch = batchPart
+        .replace(/_\(Nucleus\)_Jee\s+/i, '(N_')
+        .replace(/Jee\s+Adv/i, 'Adv)')
+        .replace(/Jee\s+Mains/i, 'Mains)')
+        .replace(/Adv$/i, 'Adv)')
+        .replace(/Mains$/i, 'Mains)');
+
+    // Ensure trailing paren if we added (N_
+    if (transformedBatch.includes('(N_') && !transformedBatch.includes(')')) transformedBatch += ')';
+
+    let testName = testPart;
+    let p1Name = testPart, p2Name = "";
+    if (testPart.includes('&')) {
+        const tParts = testPart.split('&').map(t => t.trim());
+        p1Name = tParts[0];
+        p2Name = tParts[1];
+    }
+
+    return { dateStr, batch: transformedBatch, testName, p1Name, p2Name };
 }
 
 function isKarnatakaCampus(name, allowedCampuses) {
@@ -151,11 +203,27 @@ async function processResultFile(filePath, pool, topIds, allowedCampuses, proces
     const ws = wb.Sheets[sheetName];
     const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
 
-    // Extraction Logic
-    let batch = "";
-    let dateStr = "";
-    let testName = "";
-    let headerRowIdx = -1;
+    // Discovery: Detect Type 2 Format (Title like All India Marks Analysis in row 4)
+    let type2Info = null;
+    let type2HeaderRowIdx = -1;
+    for (let i = 0; i < 10; i++) {
+        const row = data[i];
+        if (!row) continue;
+        const cell = row.find(c => {
+            const s = String(c || '').toUpperCase().replace(/_/g, ' ');
+            return s.includes('ALL INDIA') && s.includes('MARKS ANALYSIS');
+        });
+        if (cell) {
+            type2Info = parseType2Header(String(cell));
+            type2HeaderRowIdx = i;
+            break;
+        }
+    }
+
+    if (type2Info) {
+        await processType2(filePath, data, type2Info, pool, topIds, allowedCampuses, processedGroups);
+        return;
+    }
 
     // Rows 1-15 scan for metadata
     for (let i = 0; i < 20; i++) {
@@ -424,6 +492,263 @@ async function processResultFile(filePath, pool, topIds, allowedCampuses, proces
     }
 }
 
+async function processType2(filePath, data, info, pool, topIds, allowedCampuses, processedGroups) {
+    const { dateStr, batch, testName, p1Name, p2Name } = info;
+    const dbDate = formatDateToSQL(dateStr);
+
+    console.log(`  Identified Type 2 Metadata: Batch=[${batch}], Date=[${dbDate}], Test=[${testName}]`);
+
+    // Cross-file deduplication
+    const groupKey = `${testName}|${dbDate}|${batch}`;
+    if (processedGroups.has(groupKey)) {
+        console.log(`  [SKIP] Duplicate data group already processed for: ${groupKey}`);
+        return;
+    }
+    processedGroups.add(groupKey);
+
+    // Find Header Row (where TOT is)
+    let headerRowIdx = -1;
+    for (let i = 0; i < 20; i++) {
+        if (data[i] && data[i].some(c => String(c || '').trim() === 'TOT')) {
+            headerRowIdx = i;
+            break;
+        }
+    }
+    if (headerRowIdx === -1) {
+        console.error("  [ERROR] Could not find TOT header for Type 2");
+        return;
+    }
+
+    const r8 = data[headerRowIdx];
+    const r9 = data[headerRowIdx + 1] || [];
+    const r10 = data[headerRowIdx + 2] || []; // New: Third header row or Max Marks
+    const r11 = data[headerRowIdx + 3] || [];
+
+    // Base Column Mapping (ADM_NO, Name, Campus)
+    const findBase = (regex) => {
+        // Search rows 3 to headerRowIdx + 1
+        for (let r = 3; r <= headerRowIdx + 1; r++) {
+            const row = data[r];
+            if (!row) continue;
+            // Clean dots and underscores for comparison
+            const idx = row.findIndex(c => regex.test(String(c || '').trim().replace(/[\._\s]/g, '')));
+            if (idx !== -1) return idx;
+        }
+        return -1;
+    };
+
+    const colMapBase = {
+        STUD_ID: findBase(/ADMNO|STUDID|STUDENTID/i),
+        NAME: findBase(/NameoftheStudent|StudentName/i),
+        CAMPUS: findBase(/^Campus/i)
+    };
+
+    // Identify Blocks
+    const blocks = [];
+    for (let c = 0; c < r8.length; c++) {
+        if (String(r8[c]).trim() === 'TOT') {
+            const label = String(r9[c] || '').trim().replace(/\s+/g, ''); // P1+P2, P1, P2
+            let actualTest = testName;
+            if (label === 'P1') actualTest = p1Name;
+            else if (label === 'P2') actualTest = p2Name;
+            blocks.push({ label, startCol: c, test: actualTest });
+        }
+    }
+
+    const studentsToUpload = [];
+
+    for (const block of blocks) {
+        console.log(`    Mapping Block: ${block.label} (${block.test})`);
+
+        const nextBlockCol = blocks.find(b => b.startCol > block.startCol)?.startCol || r8.length;
+        const bMap = {
+            TOT: block.startCol,
+            TOT_PER: -1, AIR: -1,
+            MAT: -1, MAT_PER: -1, MAT_RANK: -1,
+            PHY: -1, PHY_PER: -1, PHY_RANK: -1,
+            CHE: -1, CHE_PER: -1, CHE_RANK: -1,
+            BEST3: -1, B1000: -1, JMAINS: -1
+        };
+
+        // Helper to find %, Rank within a sub-range (Searches Row 8, Row 9, AND Row 10)
+        const findInSub = (start, searchTerms) => {
+            const end = Math.min(start + 15, nextBlockCol);
+            for (let k = start; k < end && k < r10.length; k++) {
+                const s8 = String(r8[k] || '').trim().toUpperCase();
+                const s9 = String(r9[k] || '').trim().toUpperCase();
+                const s10 = String(r10[k] || '').trim().toUpperCase();
+                for (const term of searchTerms) {
+                    if (s8 === term || s9 === term || s10 === term ||
+                        s8.includes(term) || s9.includes(term) || s10.includes(term)) return k;
+                }
+            }
+            return -1;
+        };
+
+        // Debug: Log headers across 3 rows
+        const blockLog = [];
+        for (let k = block.startCol; k < nextBlockCol && k < r10.length; k++) {
+            blockLog.push(`[${String(r8[k] || '').trim()}|${String(r9[k] || '').trim()}|${String(r10[k] || '').trim()}]`);
+        }
+        console.log(`      Block [${block.label}] headers (3 rows): ${blockLog.slice(0, 15).join(', ')}...`);
+
+        // 1. Map TOT siblings (Search entire block range for these keywords)
+        bMap.TOT_PER = findInSub(block.startCol, ['%', 'PER', 'PERCENTAGE']);
+        bMap.AIR = findInSub(block.startCol, ['AIR', 'AIR RANK', 'AIR-RANK', 'AIR_RANK']);
+        if (bMap.AIR === -1) bMap.AIR = findInSub(block.startCol + 1, ['RANK']); // Fallback to generic rank
+
+        // 2. Map Subjects
+        const findSubjectCol = (terms) => {
+            for (let c = block.startCol; c < nextBlockCol; c++) {
+                const h8 = String(r8[c] || '').trim().toUpperCase();
+                if (terms.some(t => h8 === t)) return c;
+            }
+            return -1;
+        };
+
+        const matCol = findSubjectCol(['MAT', 'MATHEMATICS']);
+        if (matCol !== -1) {
+            bMap.MAT = matCol;
+            bMap.MAT_RANK = findInSub(matCol, ['RANK', 'MAT RANK']);
+            bMap.MAT_PER = findInSub(matCol, ['%', 'PER', 'PERCENTAGE']);
+        }
+
+        const phyCol = findSubjectCol(['PHY', 'PHYSICS']);
+        if (phyCol !== -1) {
+            bMap.PHY = phyCol;
+            bMap.PHY_RANK = findInSub(phyCol, ['RANK', 'PHY RANK']);
+            bMap.PHY_PER = findInSub(phyCol, ['%', 'PER', 'PERCENTAGE']);
+        }
+
+        const cheCol = findSubjectCol(['CHE', 'CHEMISTRY']);
+        if (cheCol !== -1) {
+            bMap.CHE = cheCol;
+            bMap.CHE_RANK = findInSub(cheCol, ['RANK', 'CHE RANK']);
+            bMap.CHE_PER = findInSub(cheCol, ['%', 'PER', 'PERCENTAGE']);
+        }
+
+        // 3. Global target columns
+        bMap.BEST3 = r8.findIndex(c => String(c || '').toUpperCase().includes('BEST OF THREE'));
+        bMap.B1000 = r8.findIndex(c => String(c || '').toUpperCase().includes('BELOW 1000'));
+        bMap.JMAINS = r8.findIndex(c => String(c || '').toUpperCase().includes('MAINS TARGET'));
+
+        console.log(`      Indices: TOT=${bMap.TOT}, %=${bMap.TOT_PER}, AIR=${bMap.AIR}, MAT=${bMap.MAT}, MAT_R=${bMap.MAT_RANK}, PHY=${bMap.PHY}, CHE=${bMap.CHE}`);
+
+        // Max Marks from Row 10 or 11
+        // Usually, in this format, Row 10 contains labels like 'Rank' and marks like '116'
+        const maxMarks = {
+            tot: parseNum(r10[bMap.TOT]) || parseNum(r11[bMap.TOT]) || (batch.includes('Adv') ? 180 : 300),
+            mat: parseNum(r10[bMap.MAT]) || parseNum(r11[bMap.MAT]) || (batch.includes('Adv') ? 60 : 100),
+            phy: parseNum(r10[bMap.PHY]) || parseNum(r11[bMap.PHY]) || (batch.includes('Adv') ? 60 : 100),
+            che: parseNum(r10[bMap.CHE]) || parseNum(r11[bMap.CHE]) || (batch.includes('Adv') ? 60 : 100)
+        };
+
+        // Extract student data (Starting from Row headerRowIdx + 3)
+        const seenRowsInFile = new Set();
+        let duplicateRowsCount = 0;
+
+        for (let i = headerRowIdx + 3; i < data.length; i++) {
+            const row = data[i];
+            if (!row || !row[colMapBase.STUD_ID]) continue;
+
+            const studIdRaw = String(row[colMapBase.STUD_ID]).trim();
+            if (isNaN(parseInt(studIdRaw)) || parseInt(studIdRaw) < 100) continue; // Skip header/max rows
+
+            // Row-level deduplication (Raw data check)
+            const rowSig = JSON.stringify(row);
+            if (seenRowsInFile.has(rowSig)) {
+                duplicateRowsCount++;
+                continue;
+            }
+            seenRowsInFile.add(rowSig);
+
+            const campusRaw = String(row[colMapBase.CAMPUS] || '').trim().toUpperCase();
+            if (!isKarnatakaCampus(campusRaw, allowedCampuses)) continue;
+
+            const cleanedCampus = cleanCampusName(campusRaw);
+
+            studentsToUpload.push({
+                Test: block.test,
+                DATE: dbDate,
+                STUD_ID: studIdRaw,
+                NAME_OF_THE_STUDENT: String(row[colMapBase.NAME] || '').trim(),
+                CAMPUS_NAME: cleanedCampus,
+                Total: parseNum(row[bMap.TOT]),
+                Total_Per: parseNum(row[bMap.TOT_PER]),
+                AIR: parseNum(row[bMap.AIR]),
+                MAT: parseNum(row[bMap.MAT]),
+                MAT_Per: parseNum(row[bMap.MAT_PER]),
+                M_Rank: parseNum(row[bMap.MAT_RANK]),
+                PHY: parseNum(row[bMap.PHY]),
+                PHY_Per: parseNum(row[bMap.PHY_PER]),
+                P_Rank: parseNum(row[bMap.PHY_RANK]),
+                CHE: parseNum(row[bMap.CHE]),
+                CHE_Per: parseNum(row[bMap.CHE_PER]),
+                C_Rank: parseNum(row[bMap.CHE_RANK]),
+                Batch: batch,
+                Year: dbDate.split('-')[0],
+                Top_ALL: topIds.has(studIdRaw) ? 'TOP' : 'ALL',
+                P1_P2: block.label,
+                Best_of_three: bMap.BEST3 !== -1 ? String(row[bMap.BEST3] || '').trim() : '',
+                Below_1000_Target: bMap.B1000 !== -1 ? String(row[bMap.B1000] || '').trim() : '',
+                Jee_Mains_Target: bMap.JMAINS !== -1 ? String(row[bMap.JMAINS] || '').trim() : '',
+                Max_Tot: maxMarks.tot,
+                Max_Mat: maxMarks.mat,
+                Max_Phy: maxMarks.phy,
+                Max_Che: maxMarks.che
+            });
+        }
+        if (duplicateRowsCount > 0) {
+            console.log(`    [INFO] Skipped ${duplicateRowsCount} duplicate student rows in block ${block.label}.`);
+        }
+    }
+
+    if (studentsToUpload.length > 0) {
+        await uploadStudents(studentsToUpload, pool);
+    }
+}
+
+async function uploadStudents(students, pool) {
+    if (students.length === 0) return;
+
+    // Use a unique set of Test + Date + Batch to delete existing
+    const uniqueGroups = new Set();
+    students.forEach(s => uniqueGroups.add(`${s.Test}|${s.DATE}|${s.Batch}`));
+
+    for (const group of uniqueGroups) {
+        const [t, d, b] = group.split('|');
+        await pool.request().query(`DELETE FROM ENGG_RESULT WHERE Test = '${t.replace(/'/g, "''")}' AND DATE = '${d}' AND Batch = '${b.replace(/'/g, "''")}'`);
+    }
+
+    const BATCH_SIZE = 100;
+    for (let i = 0; i < students.length; i += BATCH_SIZE) {
+        const batch = students.slice(i, i + BATCH_SIZE);
+        const values = batch.map(s => {
+            const cols = [
+                s.Test, s.DATE, s.STUD_ID, s.NAME_OF_THE_STUDENT, s.CAMPUS_NAME,
+                s.Total, s.Total_Per, s.AIR, s.MAT, s.MAT_Per, s.M_Rank,
+                s.PHY, s.PHY_Per, s.P_Rank, s.CHE, s.CHE_Per, s.C_Rank,
+                s.Batch, s.Year, s.Top_ALL, s.P1_P2, s.Best_of_three,
+                s.Below_1000_Target, s.Jee_Mains_Target,
+                s.Max_Tot, s.Max_Mat, s.Max_Phy, s.Max_Che
+            ].map(v => v === null || v === undefined ? 'NULL' : `'${String(v).replace(/'/g, "''")}'`);
+            return `(${cols.join(',')})`;
+        }).join(',');
+
+        const sql = `INSERT INTO ENGG_RESULT (
+            Test, DATE, STUD_ID, NAME_OF_THE_STUDENT, CAMPUS_NAME,
+            Total, Total_Per, AIR, MAT, MAT_Per, M_Rank,
+            PHY, PHY_Per, P_Rank, CHE, CHE_Per, C_Rank,
+            Batch, Year, Top_ALL, P1_P2, Best_of_three,
+            Below_1000_Target, Jee_Mains_Target,
+            Max_Tot, Max_Mat, Max_Phy, Max_Che
+        ) VALUES ${values}`;
+
+        await pool.request().query(sql);
+    }
+    console.log(`  ✅ Uploaded ${students.length} student records.`);
+}
+
 function parseNum(val) {
     if (val === undefined || val === null || val === '') return null;
     const n = parseFloat(val);
@@ -432,7 +757,7 @@ function parseNum(val) {
 
 function formatDateToSQL(s) {
     if (!s) return '2025-01-01';
-    // Handle 21-Jun-2025 or 21-Jun-25
+    // Handle 28-Sep-25 or 21-Jun-2025
     const parts = s.split(/[-/]/);
     if (parts.length === 3) {
         let day = parts[0].padStart(2, '0');

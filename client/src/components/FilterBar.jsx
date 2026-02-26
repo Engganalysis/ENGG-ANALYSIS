@@ -134,8 +134,8 @@ const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} })
             const filtersForStudents = { ...filters };
             delete filtersForStudents.studentSearch;
 
-            // Ensure TOP_ALL is sent as TOP_ALL for backend compatibility
-            if (filtersForStudents.topAll && filtersForStudents.topAll.length > 0) {
+            // Ensure topAll is handled correctly for both legacy and new backend endpoints
+            if (filtersForStudents.topAll) {
                 filtersForStudents.TOP_ALL = filtersForStudents.topAll;
             }
 

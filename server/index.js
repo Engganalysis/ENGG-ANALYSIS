@@ -538,8 +538,8 @@ app.get('/api/analysis-report', async (req, res) => {
 app.get('/api/erp/filters', async (req, res) => {
     try {
         const pool = await connectToDb();
-        const { branch, stream, testType, test } = req.query;
-        console.log(`[ERP Filters] Request: branch=${branch}, stream=${stream}, testType=${testType}, test=${test}`);
+        const { campus, stream, testType, test } = req.query;
+        console.log(`[ERP Filters] Request: campus=${campus}, stream=${stream}, testType=${testType}, test=${test}`);
 
         const buildOptionClause = (column, values) => {
             if (!values || values === 'All' || values === '__ALL__') return null;
@@ -554,8 +554,8 @@ app.get('/api/erp/filters', async (req, res) => {
             return `${column} IN (${list})`;
         };
 
-        // Note: Frontend sends 'branch' (mapped to campus filter), we query 'Branch' column
-        const branchClause = buildOptionClause('UPPER(TRIM(Branch))', branch);
+        // Note: Frontend sends 'campus' (mapped from filters state), we query 'Branch' column
+        const branchClause = buildOptionClause('UPPER(TRIM(Branch))', campus);
         const streamClause = buildOptionClause('UPPER(TRIM(Batch))', stream);
         const testTypeClause = buildOptionClause('UPPER(TRIM(Test_Type))', testType);
         const testClause = buildOptionClause('UPPER(TRIM(Test))', test);
@@ -599,6 +599,56 @@ app.get('/api/erp/filters', async (req, res) => {
     } catch (err) {
         console.error("[ERP Filters] ERROR:", err);
         res.status(500).json({ error: "Server Error", details: err.message });
+    }
+});
+
+// Get ERP Student List based on current ERP filters
+app.get('/api/erp/students', async (req, res) => {
+    try {
+        const pool = await connectToDb();
+        const { campus, stream, test, testType, topAll, quickSearch } = req.query;
+
+        let clauses = [];
+        const addClause = (field, value) => {
+            if (!value || value === 'All' || value === '__ALL__') return;
+            const valArray = Array.isArray(value) ? value : [value];
+            const cleanValues = valArray.map(v => v ? v.toString().trim().toUpperCase().replace(/'/g, "''") : '').filter(Boolean);
+            if (cleanValues.length === 0) return;
+            clauses.push(`UPPER(TRIM(${field})) IN (${cleanValues.map(v => `'${v}'`).join(',')})`);
+        };
+
+        // Map filters to ERP columns
+        addClause('Branch', campus);
+        addClause('Batch', stream);
+        addClause('Test', test);
+        addClause('Test_Type', testType);
+        addClause('Top_ALL', topAll);
+
+        if (quickSearch && quickSearch.trim() !== '') {
+            const safeSearch = quickSearch.trim().replace(/'/g, "''").toUpperCase();
+            clauses.push(`(UPPER(TRIM(Student_Name)) LIKE '%${safeSearch}%' OR UPPER(TRIM(STUD_ID)) LIKE '%${safeSearch}%')`);
+        }
+
+        const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+
+        const query = `
+            SELECT 
+                TRIM(STUD_ID) as id, 
+                MAX(TRIM(Student_Name)) as name,
+                MAX(TRIM(Branch)) as campus,
+                GROUP_CONCAT(DISTINCT TRIM(Batch) SEPARATOR ',') as stream
+            FROM ERP_REPORT_ENGG 
+            ${where} 
+            GROUP BY STUD_ID
+            ORDER BY name
+            LIMIT 100
+        `;
+
+        const result = await pool.request().query(query);
+        res.json(result.recordset);
+    } catch (err) {
+        console.error("[ERP Students] ERROR:", err);
+        res.status(500).send(err.message);
     }
 });
 

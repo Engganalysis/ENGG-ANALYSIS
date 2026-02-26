@@ -10,7 +10,6 @@ import AnalysisReport from './components/AnalysisReport';
 import AverageReport from './components/AverageReport';
 import AverageMarksReport from './components/AverageMarksReport';
 import ErrorReport from './components/ErrorReport';
-import ErrorTop100 from './components/ErrorTop100';
 import LoginPage from './components/auth/LoginPage';
 import RegisterPage from './components/auth/RegisterPage';
 import AdminDashboard from './components/admin/AdminDashboard';
@@ -166,8 +165,6 @@ const Dashboard = () => {
                 );
             case 'errors':
                 return <ErrorReport filters={globalFilters} setFilters={setGlobalFilters} />;
-            case 'error_top':
-                return (isAdmin || isCoAdmin) ? <ErrorTop100 filters={globalFilters} setFilters={setGlobalFilters} /> : <div className="p-4">Access Denied</div>;
             case 'approvals':
                 return isAdmin ? <UserApprovals /> : <div className="p-4">Access Denied</div>;
             case 'logs':
@@ -177,7 +174,7 @@ const Dashboard = () => {
         }
     };
 
-    const showFilterBar = ['analysis', 'averages', 'progress', 'errors', 'error_top'].includes(activePage);
+    const showFilterBar = ['analysis', 'averages', 'progress', 'errors'].includes(activePage);
 
     return (
         <div className="dashboard-root">
@@ -188,8 +185,7 @@ const Dashboard = () => {
                         activePage === 'averages' ? 'Average Marks Report' :
                             activePage === 'progress' ? 'Progress Report' :
                                 activePage === 'errors' ? 'Error Report' :
-                                    activePage === 'error_top' ? 'Error Top 100%' :
-                                        activePage === 'approvals' ? 'User Approvals' : 'Activity Logs'
+                                    activePage === 'approvals' ? 'User Approvals' : 'Activity Logs'
                 } />
                 <div className="content-inner">
                     {showFilterBar && (
@@ -198,7 +194,7 @@ const Dashboard = () => {
                             setFilters={setGlobalFilters}
                             restrictedCampus={isRestricted ? userAllowedCampuses : null}
                             apiEndpoints={
-                                ['errors', 'error_top'].includes(activePage)
+                                activePage === 'errors'
                                     ? { filters: '/api/erp/filters', students: '/api/erp/students' }
                                     : { filters: '/api/filters', students: '/api/studentsByCampus' }
                             }

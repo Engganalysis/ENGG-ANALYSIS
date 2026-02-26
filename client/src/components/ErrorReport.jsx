@@ -70,7 +70,7 @@ const ErrorReport = ({ filters, setFilters }) => {
                             name: row.Student_Name,
                             id: row.STUD_ID,
                             branch: row.Branch,
-                            stream: row.Stream
+                            stream: row.Batch
                         },
                         tests: {}
                     };
@@ -81,14 +81,14 @@ const ErrorReport = ({ filters, setFilters }) => {
                         meta: {
                             testName: row.Test,
                             date: row.Exam_Date,
-                            tot: row.Total,
+                            tot: row.TOT,
                             air: row.AIR,
                             mat: row.MAT,
-                            m_rank: row.M_Rank,
+                            m_rank: row.MAT_R,
                             phy: row.PHY,
-                            p_rank: row.P_Rank,
+                            p_rank: row.PHY_R,
                             chem: row.CHE,
-                            c_rank: row.C_Rank
+                            c_rank: row.CHE_R
                         },
                         questions: []
                     };
@@ -107,14 +107,9 @@ const ErrorReport = ({ filters, setFilters }) => {
                     return d2 - d1;
                 });
 
-                // Sort Questions by National Error Descending (Largest to Smallest)
+                // Sort Questions by Subject then QNo
                 testsArr = testsArr.map(t => {
                     t.questions.sort((a, b) => {
-                        const valA = parseFloat(a.National_Wide_Error) || 0;
-                        const valB = parseFloat(b.National_Wide_Error) || 0;
-                        if (valB !== valA) return valB - valA;
-
-                        // Fallback to Subject then QNo
                         const subOrder = getSubjectOrder(a.Subject) - getSubjectOrder(b.Subject);
                         if (subOrder !== 0) return subOrder;
 
@@ -428,29 +423,18 @@ const ErrorReport = ({ filters, setFilters }) => {
                 const topicLines = getSmartWrappedLines(doc, topicVal, wTopic - 2, topicLabelW);
 
                 const subLabel = "Sub Topic: ";
-                const subVal = q.Sub_Topic || '';
+                const subVal = q.Sub_Topics || '';
                 const subLabelW = doc.getTextWidth(subLabel);
                 const subLines = getSmartWrappedLines(doc, subVal, wSub - 2, subLabelW);
 
-                // Key and Perc Calcs
+                // Key Calc
                 const keyLabel = "Key: ";
                 const keyVal = q.Key_Value || '';
-                const percLabel = "Top%: ";
-                const percRaw = q.National_Wide_Error;
-                let percVal = "";
-                if (percRaw !== undefined && percRaw !== null && percRaw !== '') {
-                    const num = parseFloat(percRaw);
-                    if (!isNaN(num)) {
-                        // If it contains '%' OR it's a high number > 1, treat as already being a percentage
-                        const isAlreadyPercent = String(percRaw).includes('%') || num > 1.0;
-                        percVal = isAlreadyPercent ? Math.round(num) + "%" : Math.round(num * 100) + "%";
-                    }
-                }
+                const keyLabelW = doc.getTextWidth(keyLabel);
+                const detailsLines = getSmartWrappedLines(doc, keyVal, wDetails - 2, keyLabelW);
+                const detailsH = Math.max(2, detailsLines.length) * 4;
 
-                // Details Height: Stacked 2 lines minimum
-                const detailsLines = 2; // Key line + % line
-
-                const maxHeaderLines = Math.max(2, topicLines.length, subLines.length);
+                const maxHeaderLines = Math.max(2, topicLines.length, subLines.length, detailsLines.length);
                 const lineHeight = 4;
                 const headerH = Math.max(9, (maxHeaderLines * lineHeight) + 3);
 
@@ -537,19 +521,15 @@ const ErrorReport = ({ filters, setFilters }) => {
                 doc.line(cx + wSub, yPos, cx + wSub, yPos + headerH);
                 cx += wSub;
 
-                // Details Column (Key + Top%)
+                // Details Column (Key)
                 // Line 1: Key
                 doc.setTextColor(255, 255, 0); // Yellow
                 doc.text(keyLabel, cx + 2, ty);
                 doc.setTextColor(255, 255, 255); // White
-                doc.text(keyVal, cx + 2 + doc.getTextWidth(keyLabel), ty);
-
-                // Line 2: Top%
-                const ty2 = ty + lineHeight;
-                doc.setTextColor(255, 255, 0); // Yellow
-                doc.text(percLabel, cx + 2, ty2);
-                doc.setTextColor(255, 255, 255); // White
-                doc.text(percVal, cx + 2 + doc.getTextWidth(percLabel), ty2);
+                detailsLines.forEach((line, idx) => {
+                    const ly = ty + (idx * lineHeight);
+                    doc.text(line.text, cx + 2 + line.xOffset, ly);
+                });
 
                 doc.setDrawColor(0);
                 doc.rect(margin, yPos, contentWidth, blockH);
@@ -862,21 +842,13 @@ const ErrorReport = ({ filters, setFilters }) => {
                                                     </td>
                                                     <td style={{ border: '1px solid black', borderRight: '1px solid white', padding: '4px', verticalAlign: 'top', wordWrap: 'break-word' }}>
                                                         <span style={{ color: '#FFFF00' }}>Sub Topic: </span>
-                                                        <span style={{ color: 'white', marginLeft: '5px' }}>{q.Sub_Topic}</span>
+                                                        <span style={{ color: 'white', marginLeft: '5px' }}>{q.Sub_Topics}</span>
                                                     </td>
 
                                                     <td style={{ border: '1px solid black', textAlign: 'left', padding: '2px 4px', verticalAlign: 'top' }}>
                                                         <div>
                                                             <span style={{ color: '#FFFF00' }}>Key: </span>
                                                             <span style={{ color: 'white', marginLeft: '5px' }}>{q.Key_Value}</span>
-                                                        </div>
-                                                        <div style={{ marginTop: '2px' }}>
-                                                            <span style={{ color: '#FFFF00' }}>Top%: </span>
-                                                            <span style={{ color: 'white', marginLeft: '5px' }}>
-                                                                {q.National_Wide_Error && !isNaN(parseFloat(q.National_Wide_Error))
-                                                                    ? Math.round(parseFloat(q.National_Wide_Error) * 100) + '%'
-                                                                    : ''}
-                                                            </span>
                                                         </div>
                                                     </td>
                                                 </tr>
