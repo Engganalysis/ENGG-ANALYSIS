@@ -401,16 +401,14 @@ const ErrorReport = ({ filters, setFilters }) => {
                 const sImg = await loadImage(q.S_URL);
 
                 // Adjusted Widths - Merged Key/Perc, More space for Subs
-                const wStat = 15; // W/U
-                const wQ = 11;    // Q No
-                const wSubj = 30; // New Subject column
+                const wSubj = 30; // Subject
                 const wDetails = 22; // Key
 
                 const remainingW = contentWidth - wStat - wQ - wSubj - wDetails;
                 const wTopic = remainingW / 2;
                 const wSub = remainingW / 2;
 
-                const imgAreaW = contentWidth - wStat;
+                const imgAreaW = contentWidth; // Full width
                 const halfImgW = imgAreaW / 2;
 
                 if (bookmanBoldFont) doc.setFont("Bookman", "bold");
@@ -436,11 +434,11 @@ const ErrorReport = ({ filters, setFilters }) => {
                 const detailsH = Math.max(2, detailsLines.length) * 4;
 
                 // New Row Header Lines
-                const w4 = (contentWidth - wStat - wQ) / 4;
-                const typeLines = getSmartWrappedLines(doc, q.Question_Type || '--', w4 - 2, doc.getTextWidth("Type: "));
-                const sourceLines = getSmartWrappedLines(doc, q.Sources || '--', w4 - 2, doc.getTextWidth("Src: "));
-                const orLines = getSmartWrappedLines(doc, q.Original_Replica || '--', w4 - 2, doc.getTextWidth("O/R: "));
-                const levelLines = getSmartWrappedLines(doc, q.Level || '--', w4 - 2, doc.getTextWidth("Lvl: "));
+                const w4_header = (contentWidth) / 4;
+                const typeLines = getSmartWrappedLines(doc, q.Question_Type || '--', w4_header - 2, doc.getTextWidth("Type: "));
+                const sourceLines = getSmartWrappedLines(doc, q.Sources || '--', w4_header - 2, doc.getTextWidth("Src: "));
+                const orLines = getSmartWrappedLines(doc, q.Original_Replica || '--', w4_header - 2, doc.getTextWidth("O/R: "));
+                const levelLines = getSmartWrappedLines(doc, q.Level || '--', w4_header - 2, doc.getTextWidth("Lvl: "));
 
                 const maxHeaderLines1 = Math.max(2, topicLines.length, subLines.length, detailsLines.length);
                 const maxHeaderLines2 = Math.max(2, typeLines.length, sourceLines.length, orLines.length, levelLines.length);
@@ -449,43 +447,31 @@ const ErrorReport = ({ filters, setFilters }) => {
                 const headerH2 = Math.max(9, (maxHeaderLines2 * lineHeight) + 3);
                 const headerH = headerH1 + headerH2;
 
-                const imgTargetW = 170; // Set to fit content width
+                const imgTargetW = contentWidth - 4;
                 let qH = 0; if (qImg) qH = (qImg.height / qImg.width) * imgTargetW;
                 let sH = 0; if (sImg) sH = (sImg.height / sImg.width) * imgTargetW;
-                let maxContentH = qH + sH + 5; // Stacked height
+
+                const FOOTER_SPACE = 15;
+                const SAFE_PAGE_H = pageHeight - FOOTER_SPACE;
+
+                let maxContentH = qH + sH + 5;
                 let blockH = headerH + maxContentH + 2;
 
-                // --- Intelligent Page Break & Image Sizing ---
-                const spacing = (i > 0) ? 2 : 0;
+                const spacing = (i > 0) ? 5 : 0;
 
-                if (yPos + spacing + blockH > pageHeight - margin) {
-                    // Check size of the remaining gap. If huge, try to squeeze instead of break.
-                    const remainingSpace = (pageHeight - margin) - (yPos + spacing);
-                    const LARGE_GAP_THRESHOLD = 60; // 60mm
+                // If block is too tall for a single page, scale it down proportionally
+                const MAX_ALLOWED_H = SAFE_PAGE_H - 15;
+                if (blockH > MAX_ALLOWED_H) {
+                    const scale = (MAX_ALLOWED_H - headerH - 10) / maxContentH;
+                    qH *= scale;
+                    sH *= scale;
+                    maxContentH = qH + sH + 5;
+                    blockH = headerH + maxContentH + 2;
+                }
 
-                    let fitted = false;
-
-                    if (remainingSpace > LARGE_GAP_THRESHOLD) {
-                        const availImgH = remainingSpace - headerH - 2;
-                        const scale = availImgH / maxContentH;
-
-                        // Only squeeze if we have decent space (>35mm) and don't shrink too aggressively (>60% of original)
-                        if (availImgH > 35 && scale > 0.6) {
-                            if (qH > availImgH) qH = availImgH;
-                            if (sH > availImgH) sH = availImgH;
-
-                            maxContentH = Math.max(qH, sH, 20);
-                            blockH = headerH + maxContentH + 2;
-                            fitted = true;
-                        }
-                    }
-
-                    if (fitted) {
-                        yPos += spacing;
-                    } else {
-                        doc.addPage();
-                        yPos = 15;
-                    }
+                if (yPos + spacing + blockH > SAFE_PAGE_H) {
+                    doc.addPage();
+                    yPos = 15;
                 } else {
                     yPos += spacing;
                 }
@@ -555,71 +541,44 @@ const ErrorReport = ({ filters, setFilters }) => {
                 doc.setDrawColor(255);
                 doc.line(margin, yPos2, margin + contentWidth, yPos2);
 
-                let cx2 = margin + wStat + wQ;
+                let cx2 = margin; // Start from margin
                 const ty2 = yPos2 + 4.5;
-                // w4 is already defined above
-
-                const renderSubCol = (label, lines, x, y) => {
-                    doc.setTextColor(255, 255, 0);
-                    doc.text(label, x + 1, y);
-                    doc.setTextColor(255, 255, 255);
-                    const lOffset = doc.getTextWidth(label);
-                    lines.forEach((line, idx) => {
-                        const ly = y + (idx * lineHeight);
-                        doc.text(line.text, x + 1 + line.xOffset, ly);
-                    });
-                };
+                const w4 = contentWidth / 4; // Use full width
 
                 renderSubCol("Type: ", typeLines, cx2, ty2);
-                doc.line(cx2 + w4, yPos2, cx2 + w4, yPos + headerH);
-                cx2 += w4;
+                doc.line(cx2 + w4_header, yPos2, cx2 + w4_header, yPos + headerH);
+                cx2 += w4_header;
 
                 renderSubCol("Src: ", sourceLines, cx2, ty2);
-                doc.line(cx2 + w4, yPos2, cx2 + w4, yPos + headerH);
-                cx2 += w4;
+                doc.line(cx2 + w4_header, yPos2, cx2 + w4_header, yPos + headerH);
+                cx2 += w4_header;
 
                 renderSubCol("O/R: ", orLines, cx2, ty2);
-                doc.line(cx2 + w4, yPos2, cx2 + w4, yPos + headerH);
-                cx2 += w4;
+                doc.line(cx2 + w4_header, yPos2, cx2 + w4_header, yPos + headerH);
+                cx2 += w4_header;
 
                 renderSubCol("Lvl: ", levelLines, cx2, ty2);
 
                 doc.setDrawColor(0);
                 doc.rect(margin, yPos, contentWidth, blockH);
 
-                doc.setFillColor(79, 129, 189);
-                doc.rect(margin, yPos + headerH, wStat, blockH - headerH, 'F');
-                // Removed rotated subject text per user request
-
-                doc.setTextColor(255);
-                // The subject text is now in the header row, so no need for rotated text here.
-                // const subTxt = String(q.Subject || '');
-                // let fs = 9; doc.setFontSize(fs);
-                // const maxSW = wStat - 2;
-                // while (doc.getTextWidth(subTxt) > maxSW && fs > 4) {
-                //     fs -= 0.5; doc.setFontSize(fs);
-                // }
-                // const scy = yPos + headerH + ((blockH - headerH) / 2);
-                // // Rotate subject text to fit vertical bar
-                // doc.text(subTxt, margin + (wStat / 2), scy, { align: 'center', angle: 90 });
-
-                const ibx = margin + wStat;
+                // Removed vertical sidebar per user request
+                const ibx = margin;
                 const iby = yPos + headerH;
-                doc.setDrawColor(0);
-                doc.line(ibx + halfImgW, iby, ibx + halfImgW, yPos + blockH);
+                // Removed middle line divider
 
                 const drwImg = (img, x, y, w, h) => {
                     if (!img) return;
                     try { doc.addImage(img, 'PNG', x + 2, y + 1, w, h); } catch (e) { }
                 };
 
-                if (qImg) drwImg(qImg, ibx, iby, imgTargetW - 4, qH);
+                if (qImg) drwImg(qImg, ibx, iby, imgTargetW, qH);
                 else {
                     doc.setTextColor(150); doc.setFontSize(8);
-                    doc.text("No Q Image", ibx + 5, iby + 5);
+                    doc.text("No Q Image", ibx + 10, iby + 10);
                 }
 
-                if (sImg) drwImg(sImg, ibx, iby + qH + 2, imgTargetW - 4, sH);
+                if (sImg) drwImg(sImg, ibx, iby + qH + 2, imgTargetW, sH);
 
                 yPos += blockH;
             }
@@ -910,8 +869,7 @@ const ErrorReport = ({ filters, setFilters }) => {
                                                     </td>
                                                 </tr>
                                                 <tr style={{ backgroundColor: '#800000', color: 'white', fontSize: '11px', fontWeight: 'bold' }}>
-                                                    <td colSpan="2" style={{ border: '1px solid black', borderRight: '1px solid white', borderTop: '1px solid white' }}></td>
-                                                    <td style={{ border: '1px solid black', borderRight: '1px solid white', padding: '4px', borderTop: '1px solid white' }}>
+                                                    <td colSpan="2" style={{ border: '1px solid black', borderRight: '1px solid white', borderTop: '1px solid white', padding: '4px' }}>
                                                         <span style={{ color: '#FFFF00' }}>Type: </span>
                                                         <span style={{ color: 'white', marginLeft: '5px' }}>{q.Question_Type || '--'}</span>
                                                     </td>
@@ -919,26 +877,25 @@ const ErrorReport = ({ filters, setFilters }) => {
                                                         <span style={{ color: '#FFFF00' }}>Sources: </span>
                                                         <span style={{ color: 'white', marginLeft: '5px' }}>{q.Sources || '--'}</span>
                                                     </td>
+                                                    <td colSpan="2" style={{ border: '1px solid black', borderRight: '1px solid white', padding: '4px', borderTop: '1px solid white' }}>
+                                                        <span style={{ color: '#FFFF00' }}>O/R: </span>
+                                                        <span style={{ color: 'white', marginLeft: '5px' }}>{q.Original_Replica || '--'}</span>
+                                                    </td>
                                                     <td style={{ border: '1px solid black', padding: '4px', borderTop: '1px solid white' }}>
-                                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                            <span><span style={{ color: '#FFFF00' }}>O/R: </span>{q.Original_Replica || '--'}</span>
-                                                            <span style={{ marginLeft: '10px' }}><span style={{ color: '#FFFF00' }}>Level: </span>{q.Level || '--'}</span>
-                                                        </div>
+                                                        <span style={{ color: '#FFFF00' }}>Level: </span>
+                                                        <span style={{ color: 'white', marginLeft: '5px' }}>{q.Level || '--'}</span>
                                                     </td>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 <tr>
-                                                    <td style={{ backgroundColor: '#4F81BD', border: '1px solid black', verticalAlign: 'middle', textAlign: 'center', padding: '0 5px', color: 'white', fontWeight: 'bold', fontSize: '12px' }}>
-                                                        <div style={{ transform: 'rotate(-90deg)', whiteSpace: 'nowrap' }}>{/* q.Subject - removed from vertical bar */}</div>
-                                                    </td>
-
-                                                    <td colSpan="4" style={{ padding: 0, border: '1px solid black' }}>
+                                                    {/* Removed vertical blue sidebar td */}
+                                                    <td colSpan="6" style={{ padding: 0, border: '1px solid black' }}>
                                                         <div style={{ borderBottom: '1px solid black' }}>
                                                             <div style={{ padding: '4px', fontSize: '10px', fontWeight: 'bold', color: '#666' }}>Q.{q.Q_No}</div>
                                                             <div style={{ textAlign: 'center', paddingBottom: '10px' }}>
                                                                 {q.Q_URL ? (
-                                                                    <img src={q.Q_URL} style={{ width: '642px', maxWidth: '100%', height: 'auto', display: 'block', margin: '0 auto' }} alt="Q" />
+                                                                    <img src={q.Q_URL} style={{ width: '100%', height: 'auto', display: 'block', margin: '0 auto' }} alt="Q" />
                                                                 ) : (
                                                                     <div style={{ padding: '20px', fontStyle: 'italic', color: '#ccc', fontSize: '12px' }}>No Image</div>
                                                                 )}
@@ -948,7 +905,7 @@ const ErrorReport = ({ filters, setFilters }) => {
                                                             <div style={{ padding: '4px', fontSize: '10px', fontWeight: 'bold', color: '#666' }}>Sol</div>
                                                             <div style={{ textAlign: 'center', paddingBottom: '10px' }}>
                                                                 {q.S_URL ? (
-                                                                    <img src={q.S_URL} style={{ width: '642px', maxWidth: '100%', height: 'auto', display: 'block', margin: '0 auto' }} alt="S" />
+                                                                    <img src={q.S_URL} style={{ width: '100%', height: 'auto', display: 'block', margin: '0 auto' }} alt="S" />
                                                                 ) : (
                                                                     <div style={{ padding: '20px', fontStyle: 'italic', color: '#ccc', fontSize: '12px' }}>No Solution</div>
                                                                 )}
