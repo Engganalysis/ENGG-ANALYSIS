@@ -1,7 +1,7 @@
 @echo off
 title Engineering Analysis - Full Deploy
-:: Automated commit message based on recent Error Analysis improvements
-set "msg=Fix: Improved Error Analysis Report (Headers, Image Scaling, and Subject Mapping)"
+:: Automated commit message for current set of improvements
+set "msg=Fix: PDF Space Optimization, Image Splitting across pages, and Header overlap fixes"
 
 echo.
 echo === [1/4] Adding and Committing changes ===
