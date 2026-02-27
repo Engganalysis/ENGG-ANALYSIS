@@ -4,11 +4,14 @@ import { buildQueryParams, formatDate, API_URL } from '../utils/apiHelper';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import jsPDF from 'jspdf';
+import { useAuth } from './auth/AuthProvider';
+import { logActivity } from '../utils/activityLogger';
 import autoTable from 'jspdf-autotable';
 import { Trophy, AlertCircle, FileSpreadsheet, FileText } from 'lucide-react';
 
 
 const AverageMarksReport = ({ filters }) => {
+    const { userData } = useAuth();
     const [data, setData] = useState([]);
     const [examMeta, setExamMeta] = useState([]);
     const [totalConducted, setTotalConducted] = useState(0);
@@ -42,6 +45,11 @@ const AverageMarksReport = ({ filters }) => {
                 setTotalConducted(0);
             } finally {
                 setLoading(false);
+                if (result?.students?.length > 0) {
+                    logActivity(userData, 'Generated Estimated Avg Report', {
+                        studentCount: result.students.length
+                    });
+                }
             }
         };
         const timeoutId = setTimeout(() => { fetchData(); }, 500);
@@ -267,6 +275,7 @@ const AverageMarksReport = ({ filters }) => {
 
         const buffer = await workbook.xlsx.writeBuffer();
         saveAs(new Blob([buffer]), `${getDynamicFileName()}.xlsx`);
+        logActivity(userData, 'Exported Estimated Avg Excel', { filename: getDynamicFileName() });
     };
 
 

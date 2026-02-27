@@ -7,6 +7,7 @@ import jsPDF from 'jspdf';
 import { saveAs } from 'file-saver';
 import JSZip from 'jszip';
 import Select from 'react-select';
+import { logActivity } from '../utils/activityLogger';
 
 // Subject Sorting Order
 const SUBJECT_ORDER = {
@@ -124,6 +125,12 @@ const ErrorReport = ({ filters, setFilters }) => {
             });
 
             setReportData(processed);
+
+            // Log activity
+            logActivity(userData, 'Generated Error Report', {
+                studentCount: processed.length,
+                subject: subjectFilter
+            });
 
         } catch (err) {
             console.error("Error fetching report:", err);
@@ -685,6 +692,7 @@ const ErrorReport = ({ filters, setFilters }) => {
             if (reportData.length === 1) {
                 const doc = await createStudentPDF(reportData[0], fonts, logoImg);
                 doc.save(`${reportData[0].info.name}_${reportData[0].info.branch}.pdf`);
+                logActivity(userData, 'Downloaded Error PDF', { student: reportData[0].info.name });
             } else {
                 const zip = new JSZip();
 
@@ -698,7 +706,8 @@ const ErrorReport = ({ filters, setFilters }) => {
 
                 setPdfProgress('Compressing...');
                 const zipContent = await zip.generateAsync({ type: 'blob' });
-                saveAs(zipContent, `Error_Reports_${subjectFilter.value}.zip`);
+                saveAs(zipContent, `Error_Reports_${subjectFilter}.zip`);
+                logActivity(userData, 'Downloaded Bulk Error Reports', { count: reportData.length, subject: subjectFilter });
             }
 
         } catch (err) {

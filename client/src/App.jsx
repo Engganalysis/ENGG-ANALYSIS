@@ -18,6 +18,7 @@ import { AuthProvider, useAuth } from './components/auth/AuthProvider';
 import Sidebar from './components/Sidebar';
 import UserApprovals from './components/admin/UserApprovals';
 import ActivityLogs from './components/admin/ActivityLogs';
+import { logActivity } from './utils/activityLogger';
 
 const ProtectedRoute = ({ children, requireAdmin = false }) => {
     const { currentUser, userData, loading, isAdmin } = useAuth();
@@ -69,7 +70,19 @@ const Dashboard = () => {
     // Update sessionStorage whenever activePage changes
     useEffect(() => {
         sessionStorage.setItem('dashboard_active_page', activePage);
-    }, [activePage]);
+        // Log page view
+        if (!isAdmin && userData) {
+            const pageNames = {
+                'analysis': 'Analysis Report',
+                'averages': 'Average Marks Report',
+                'progress': 'Progress Report',
+                'errors': 'Error Report',
+                'approvals': 'User Approvals',
+                'logs': 'Activity Logs'
+            };
+            logActivity(userData, `Opened ${pageNames[activePage] || activePage} Page`);
+        }
+    }, [activePage, isAdmin, userData]);
 
     const userAllowedCampuses = userData?.allowedCampuses || (userData?.campus && userData.campus !== 'All' ? [userData.campus] : []);
     const isRestricted = !isAdmin && userAllowedCampuses.length > 0 && !userAllowedCampuses.includes('All');
@@ -119,25 +132,9 @@ const Dashboard = () => {
         const isSessionActive = sessionStorage.getItem(sessionKey);
 
         if (!isAdmin && userData?.email && !hasLoggedSession.current && !isSessionActive) {
-            const logActivity = async () => {
-                try {
-                    hasLoggedSession.current = true;
-                    sessionStorage.setItem(sessionKey, 'true'); // Mark session as active
-
-                    await addDoc(collection(db, "activity_logs"), {
-                        email: userData.email,
-                        name: userData.name,
-                        campus: userData.campus,
-                        timestamp: new Date().toISOString(),
-                        action: 'Opened Dashboard'
-                    });
-                } catch (err) {
-                    hasLoggedSession.current = false;
-                    sessionStorage.removeItem(sessionKey); // Retry on next attempt if failed
-                    console.error("Failed to log activity:", err);
-                }
-            };
-            logActivity();
+            hasLoggedSession.current = true;
+            sessionStorage.setItem(sessionKey, 'true'); // Mark session as active
+            logActivity(userData, 'Logged In/Opened Dashboard');
         }
     }, [userData, isAdmin]);
 

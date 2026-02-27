@@ -12,6 +12,7 @@ import AnalysisReport from '../AnalysisReport';
 import AverageReport from '../AverageReport';
 import Modal from '../Modal';
 import { useAuth } from '../auth/AuthProvider';
+import ActivityLogs from './ActivityLogs';
 
 const AdminDashboard = () => {
     const { currentUser } = useAuth();
@@ -42,19 +43,6 @@ const AdminDashboard = () => {
         if (activeTab === 'users') {
             fetchUsers();
             return;
-        }
-
-        if (activeTab === 'logs') {
-            const q = query(collection(db, "activity_logs"), orderBy("timestamp", "desc"), limit(50));
-            setLoading(true);
-            const unsubscribe = onSnapshot(q, (snapshot) => {
-                setActivityLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-                setLoading(false);
-            }, (error) => {
-                console.error("Error fetching logs:", error);
-                setLoading(false);
-            });
-            return () => unsubscribe();
         }
     }, [activeTab]);
 
@@ -164,19 +152,19 @@ const AdminDashboard = () => {
 
                 <div className="nav-tabs">
                     <button
-                        className={`nav - tab ${activeTab === 'users' ? 'active' : ''} `}
+                        className={`nav-tab ${activeTab === 'users' ? 'active' : ''}`}
                         onClick={() => setActiveTab('users')}
                     >
                         <Users size={18} /> Principal Access
                     </button>
                     <button
-                        className={`nav - tab ${activeTab === 'analytics' ? 'active' : ''} `}
+                        className={`nav-tab ${activeTab === 'analytics' ? 'active' : ''}`}
                         onClick={() => setActiveTab('analytics')}
                     >
                         <BarChart3 size={18} /> Analytics & Reports
                     </button>
                     <button
-                        className={`nav - tab ${activeTab === 'logs' ? 'active' : ''} `}
+                        className={`nav-tab ${activeTab === 'logs' ? 'active' : ''}`}
                         onClick={() => setActiveTab('logs')}
                     >
                         <Activity size={18} /> Live Activity
@@ -304,53 +292,7 @@ const AdminDashboard = () => {
                     </div>
                 )}
 
-                {activeTab === 'logs' && (
-                    <div className="tab-pane">
-                        <div className="pane-header">
-                            <div>
-                                <h3>Live Activity Logs</h3>
-                                <p>Track which principals are accessing the dashboard in real-time</p>
-                            </div>
-                        </div>
-
-                        <div className="admin-card full-width no-padding">
-                            <div className="table-wrapper">
-                                <table className="modern-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Principal Name</th>
-                                            <th>Campus</th>
-                                            <th>Date & Time</th>
-                                            <th>Action</th>
-                                            <th>Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {activityLogs.map(log => (
-                                            <tr key={log.id}>
-                                                <td className="font-bold">{log.name}</td>
-                                                <td>{log.campus}</td>
-                                                <td>
-                                                    <div className="time-display">
-                                                        <span className="date">{new Date(log.timestamp).toLocaleDateString()}</span>
-                                                        <span className="time">{new Date(log.timestamp).toLocaleTimeString()}</span>
-                                                    </div>
-                                                </td>
-                                                <td><span className="action-tag">{log.action}</span></td>
-                                                <td><span className="online-indicator"></span> Live</td>
-                                            </tr>
-                                        ))}
-                                        {activityLogs.length === 0 && (
-                                            <tr>
-                                                <td colSpan="5" className="text-center py-8">No activity recorded yet</td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                {activeTab === 'logs' && <ActivityLogs />}
             </main>
 
             <Modal
