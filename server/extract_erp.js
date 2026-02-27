@@ -651,7 +651,8 @@ function loadKeys(filePath) {
             // Normalize QNo to string integer (so "1" matches "01")
             const qNo = String(parseInt(qNoRaw, 10));
             if (qNo !== 'NaN') {
-                keys[qNo] = String(r[keyColName] || '').trim();
+                const val = r[keyColName];
+                keys[qNo] = (val !== undefined && val !== null) ? String(val).trim() : '';
             }
         });
     } else {
@@ -661,7 +662,8 @@ function loadKeys(filePath) {
             const qNoRaw = r['Q_No'] || r['Q.No'] || r['QNo'] || r['Q. No'];
             if (qNoRaw) {
                 const qNo = String(parseInt(qNoRaw, 10));
-                keys[qNo] = String(r['Key'] || '').trim();
+                const val = r['Key'] || r['Answer'] || r['Correct Key'];
+                keys[qNo] = (val !== undefined && val !== null) ? String(val).trim() : '';
             }
         });
     }

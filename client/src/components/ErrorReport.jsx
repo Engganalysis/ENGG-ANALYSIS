@@ -436,9 +436,9 @@ const ErrorReport = ({ filters, setFilters }) => {
                 const detailsH = Math.max(2, detailsLines.length) * 4;
 
                 // Proportional Row 2 Header Widths
-                const wType = contentWidth * 0.40;  // 40% for Type (long)
-                const wSrc = contentWidth * 0.20;   // 20%
-                const wOR = contentWidth * 0.20;    // 20% (shorter)
+                const wType = contentWidth * 0.45;  // 45% for Type (long)
+                const wSrc = contentWidth * 0.15;   // 15%
+                const wOR = contentWidth * 0.20;    // 20%
                 const wLvl = contentWidth * 0.20;   // 20%
 
                 const typeLines = getSmartWrappedLines(doc, q.Question_Type || '--', wType - 2, doc.getTextWidth("Type: "));
@@ -460,22 +460,21 @@ const ErrorReport = ({ filters, setFilters }) => {
                 const FOOTER_SPACE = 15;
                 const SAFE_PAGE_H = pageHeight - FOOTER_SPACE;
 
-                let maxContentH = qH + sH + 5;
-                let blockH = headerH + maxContentH + 2;
-
-                const spacing = (i > 0) ? 5 : 0;
-
-                // If block is too tall for a single page, scale it down proportionally
-                const MAX_ALLOWED_H = SAFE_PAGE_H - 15;
-                if (blockH > MAX_ALLOWED_H) {
-                    const scale = (MAX_ALLOWED_H - headerH - 10) / maxContentH;
+                // Scaling logic for oversized questions (entire page)
+                const MAX_IMG_H = SAFE_PAGE_H - 30 - headerH;
+                if ((qH + sH) > MAX_IMG_H) {
+                    const scale = MAX_IMG_H / (qH + sH);
                     qH *= scale;
                     sH *= scale;
-                    maxContentH = qH + sH + 5;
-                    blockH = headerH + maxContentH + 2;
                 }
 
-                if (yPos + spacing + blockH > SAFE_PAGE_H) {
+                const spacing = (i === 0 && yPos < 100) ? 2 : (i > 0 ? 5 : 0);
+
+                // --- SMART SPLIT LOGIC ---
+                // Try to fit at least the Header + Q Image. 
+                // If Solution doesn't fit, it moves to next page.
+                const minH = headerH + qH + 5;
+                if (yPos + spacing + minH > SAFE_PAGE_H) {
                     doc.addPage();
                     yPos = 15;
                 } else {
@@ -492,12 +491,12 @@ const ErrorReport = ({ filters, setFilters }) => {
                 // W/U
                 doc.text(String(q.W_U || ''), cx + (wStat / 2), ty, { align: 'center' });
                 doc.setDrawColor(255);
-                doc.line(cx + wStat, yPos, cx + wStat, yPos + headerH);
+                doc.line(cx + wStat, yPos, cx + wStat, yPos + headerH1);
                 cx += wStat;
 
                 // Q No
                 doc.text(String(q.Q_No), cx + (wQ / 2), ty, { align: 'center' });
-                doc.line(cx + wQ, yPos, cx + wQ, yPos + headerH);
+                doc.line(cx + wQ, yPos, cx + wQ, yPos + headerH1);
                 cx += wQ;
 
                 // Subject Renderer
@@ -518,7 +517,7 @@ const ErrorReport = ({ filters, setFilters }) => {
                     doc.text(line.text, cx + 1 + line.xOffset, ly);
                 });
                 doc.setDrawColor(255);
-                doc.line(cx + wTopic, yPos, cx + wTopic, yPos + headerH);
+                doc.line(cx + wTopic, yPos, cx + wTopic, yPos + headerH1);
                 cx += wTopic;
 
                 // Sub Topic Renderer
@@ -561,41 +560,56 @@ const ErrorReport = ({ filters, setFilters }) => {
                 };
 
                 renderSubCol("Type: ", typeLines, cx2, ty2);
-                doc.line(cx2 + wType, yPos2, cx2 + wType, yPos + headerH);
+                doc.line(cx2 + wType, yPos2, cx2 + wType, yPos2 + headerH2);
                 cx2 += wType;
 
                 renderSubCol("Src: ", sourceLines, cx2, ty2);
-                doc.line(cx2 + wSrc, yPos2, cx2 + wSrc, yPos + headerH);
+                doc.line(cx2 + wSrc, yPos2, cx2 + wSrc, yPos2 + headerH2);
                 cx2 += wSrc;
 
                 renderSubCol("O/R: ", orLines, cx2, ty2);
-                doc.line(cx2 + wOR, yPos2, cx2 + wOR, yPos + headerH);
+                doc.line(cx2 + wOR, yPos2, cx2 + wOR, yPos2 + headerH2);
                 cx2 += wOR;
 
                 renderSubCol("Lvl: ", levelLines, cx2, ty2);
 
-                doc.setDrawColor(0);
-                doc.rect(margin, yPos, contentWidth, blockH);
-
-                // Removed vertical sidebar per user request
                 const ibx = margin;
                 const iby = yPos + headerH;
-                // Removed middle line divider
 
                 const drwImg = (img, x, y, w, h) => {
                     if (!img) return;
                     try { doc.addImage(img, 'PNG', x + 2, y + 1, w, h); } catch (e) { }
                 };
 
-                if (qImg) drwImg(qImg, ibx, iby, imgTargetW, qH);
-                else {
+                // Draw Q Image
+                if (qImg) {
+                    drwImg(qImg, ibx, iby, imgTargetW, qH);
+                } else {
                     doc.setTextColor(150); doc.setFontSize(8);
                     doc.text("No Q Image", ibx + 10, iby + 10);
                 }
 
-                if (sImg) drwImg(sImg, ibx, iby + qH + 2, imgTargetW, sH);
+                // Check Solution Image Fit
+                let nextY = iby + qH + 2;
+                if (sImg) {
+                    if (nextY + sH + 3 > SAFE_PAGE_H) {
+                        doc.addPage();
+                        nextY = 15;
+                        // Optional: Small Q No label for context
+                        doc.setFontSize(8); doc.setTextColor(150);
+                        doc.text(`Q${q.Q_No} Solution (contd.)`, margin, nextY - 2);
+                        drwImg(sImg, ibx, nextY, imgTargetW, sH);
+                        yPos = nextY + sH + 3;
+                    } else {
+                        drwImg(sImg, ibx, nextY, imgTargetW, sH);
+                        yPos = nextY + sH + 3;
+                    }
+                } else {
+                    yPos = nextY;
+                }
 
-                yPos += blockH;
+                // Draw final bounding box (full block might span pages, so we don't draw rect)
+                // doc.rect(margin, yPos, contentWidth, blockH); 
             }
         }
 
