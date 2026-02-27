@@ -1,7 +1,7 @@
 @echo off
 title Engineering Analysis - Full Deploy
 :: Automated commit message for current set of improvements
-set "msg=Fix: PDF Space Optimization, Image Splitting across pages, and Header overlap fixes"
+set "msg=Fix: Aggressive PDF space optimization with smart image shrinking to remove blank gaps"
 
 echo.
 echo === [1/4] Adding and Committing changes ===

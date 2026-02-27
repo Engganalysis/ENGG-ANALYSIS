@@ -460,8 +460,8 @@ const ErrorReport = ({ filters, setFilters }) => {
                 const FOOTER_SPACE = 15;
                 const SAFE_PAGE_H = pageHeight - FOOTER_SPACE;
 
-                // Scaling logic for oversized questions (entire page)
-                const MAX_IMG_H = SAFE_PAGE_H - 30 - headerH;
+                // Pre-scale massive images that exceed a full page
+                const MAX_IMG_H = SAFE_PAGE_H - 10 - headerH;
                 if ((qH + sH) > MAX_IMG_H) {
                     const scale = MAX_IMG_H / (qH + sH);
                     qH *= scale;
@@ -469,20 +469,38 @@ const ErrorReport = ({ filters, setFilters }) => {
                 }
 
                 const spacing = (i === 0 && yPos < 100) ? 2 : (i > 0 ? 5 : 0);
+                let currentY = yPos + spacing;
 
-                // --- SMART SPLIT LOGIC ---
-                // Try to fit at least the Header + Q Image. 
-                // If Solution doesn't fit, it moves to next page.
-                const minH = headerH + qH + 5;
-                if (yPos + spacing + minH > SAFE_PAGE_H) {
-                    doc.addPage();
-                    yPos = 15;
-                } else {
-                    yPos += spacing;
+                // --- AGGRESSIVE SPACE OPTIMIZATION ---
+                // Try to fit Header + Q Image on current page
+                let qAreaH = qH + 2;
+                let totalNeededQ = headerH + qAreaH;
+                let availQ = SAFE_PAGE_H - currentY;
+
+                if (totalNeededQ > availQ) {
+                    // Can we shrink Q to fit? Only if we have at least 50mm space
+                    if (availQ > 50) {
+                        const targetQH = availQ - headerH - 5;
+                        const scale = targetQH / qH;
+                        if (scale >= 0.6) { // Readability check
+                            qH = targetQH;
+                            qAreaH = qH + 2;
+                        } else {
+                            doc.addPage();
+                            currentY = 15;
+                        }
+                    } else {
+                        doc.addPage();
+                        currentY = 15;
+                    }
                 }
+                yPos = currentY;
 
                 doc.setFillColor(128, 0, 0);
                 doc.rect(margin, yPos, contentWidth, headerH, 'F');
+                doc.setDrawColor(0);
+                doc.rect(margin, yPos, contentWidth, headerH, 'D'); // Header border
+
                 doc.setTextColor(255);
 
                 let cx = margin;
@@ -581,35 +599,58 @@ const ErrorReport = ({ filters, setFilters }) => {
                     try { doc.addImage(img, 'PNG', x + 2, y + 1, w, h); } catch (e) { }
                 };
 
-                // Draw Q Image
+                // Draw Q Image Area
+                qAreaH = qH + 2;
                 if (qImg) {
                     drwImg(qImg, ibx, iby, imgTargetW, qH);
                 } else {
                     doc.setTextColor(150); doc.setFontSize(8);
                     doc.text("No Q Image", ibx + 10, iby + 10);
                 }
+                doc.setDrawColor(0);
+                doc.rect(margin, iby, contentWidth, qAreaH); // Border for Q
 
                 // Check Solution Image Fit
-                let nextY = iby + qH + 2;
+                let nextY = iby + qAreaH;
                 if (sImg) {
-                    if (nextY + sH + 3 > SAFE_PAGE_H) {
-                        doc.addPage();
-                        nextY = 15;
-                        // Optional: Small Q No label for context
+                    let sAreaH = sH + 2;
+                    let availS = SAFE_PAGE_H - nextY;
+
+                    if (sAreaH > availS) {
+                        // Can we shrink S to fit? 
+                        if (availS > 45) {
+                            const targetSH = availS - 5;
+                            const scale = targetSH / sH;
+                            if (scale >= 0.6) {
+                                sH = targetSH;
+                                sAreaH = sH + 2;
+                            } else {
+                                doc.addPage();
+                                nextY = 15;
+                            }
+                        } else {
+                            doc.addPage();
+                            nextY = 15;
+                        }
+                    }
+
+                    // Final drawing positioning check
+                    if (nextY === 15) {
                         doc.setFontSize(8); doc.setTextColor(150);
                         doc.text(`Q${q.Q_No} Solution (contd.)`, margin, nextY - 2);
                         drwImg(sImg, ibx, nextY, imgTargetW, sH);
-                        yPos = nextY + sH + 3;
+                        doc.setDrawColor(0);
+                        doc.rect(margin, nextY, contentWidth, sH + 2);
+                        yPos = nextY + sH + 4;
                     } else {
                         drwImg(sImg, ibx, nextY, imgTargetW, sH);
-                        yPos = nextY + sH + 3;
+                        doc.setDrawColor(0);
+                        doc.rect(margin, nextY, contentWidth, sH + 2);
+                        yPos = nextY + sH + 4;
                     }
                 } else {
-                    yPos = nextY;
+                    yPos = nextY + 2;
                 }
-
-                // Draw final bounding box (full block might span pages, so we don't draw rect)
-                // doc.rect(margin, yPos, contentWidth, blockH); 
             }
         }
 
