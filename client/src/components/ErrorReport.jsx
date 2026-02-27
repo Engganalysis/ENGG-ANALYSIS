@@ -401,12 +401,13 @@ const ErrorReport = ({ filters, setFilters }) => {
                 const sImg = await loadImage(q.S_URL);
 
                 // Adjusted Widths - Merged Key/Perc, More space for Subs
-                const wStat = 15; // W/U reduced
-                const wQ = 11;    // Q No reduced
-                const wDetails = 22; // Merged Key & Top%
+                const wStat = 15; // W/U
+                const wQ = 11;    // Q No
+                const wSubj = 30; // New Subject column
+                const wDetails = 22; // Key
 
-                const remainingW = contentWidth - wStat - wQ - wDetails;
-                const wTopic = remainingW / 2; // Equal split
+                const remainingW = contentWidth - wStat - wQ - wSubj - wDetails;
+                const wTopic = remainingW / 2;
                 const wSub = remainingW / 2;
 
                 const imgAreaW = contentWidth - wStat;
@@ -434,9 +435,19 @@ const ErrorReport = ({ filters, setFilters }) => {
                 const detailsLines = getSmartWrappedLines(doc, keyVal, wDetails - 2, keyLabelW);
                 const detailsH = Math.max(2, detailsLines.length) * 4;
 
-                const maxHeaderLines = Math.max(2, topicLines.length, subLines.length, detailsLines.length);
+                // New Row Header Lines
+                const w4 = (contentWidth - wStat - wQ) / 4;
+                const typeLines = getSmartWrappedLines(doc, q.Question_Type || '--', w4 - 2, doc.getTextWidth("Type: "));
+                const sourceLines = getSmartWrappedLines(doc, q.Sources || '--', w4 - 2, doc.getTextWidth("Src: "));
+                const orLines = getSmartWrappedLines(doc, q.Original_Replica || '--', w4 - 2, doc.getTextWidth("O/R: "));
+                const levelLines = getSmartWrappedLines(doc, q.Level || '--', w4 - 2, doc.getTextWidth("Lvl: "));
+
+                const maxHeaderLines1 = Math.max(2, topicLines.length, subLines.length, detailsLines.length);
+                const maxHeaderLines2 = Math.max(2, typeLines.length, sourceLines.length, orLines.length, levelLines.length);
                 const lineHeight = 4;
-                const headerH = Math.max(9, (maxHeaderLines * lineHeight) + 3);
+                const headerH1 = Math.max(9, (maxHeaderLines1 * lineHeight) + 3);
+                const headerH2 = Math.max(9, (maxHeaderLines2 * lineHeight) + 3);
+                const headerH = headerH1 + headerH2;
 
                 const imgTargetW = 170; // Set to fit content width
                 let qH = 0; if (qImg) qH = (qImg.height / qImg.width) * imgTargetW;
@@ -497,6 +508,15 @@ const ErrorReport = ({ filters, setFilters }) => {
                 doc.line(cx + wQ, yPos, cx + wQ, yPos + headerH);
                 cx += wQ;
 
+                // Subject Renderer
+                doc.setTextColor(255, 255, 0); // Yellow
+                doc.text("Sub:", cx + 1, ty);
+                doc.setTextColor(255, 255, 255); // White
+                doc.text(String(q.Subject || '--'), cx + 1 + doc.getTextWidth("Sub:"), ty);
+                doc.setDrawColor(255);
+                doc.line(cx + wSubj, yPos, cx + wSubj, yPos + headerH1);
+                cx += wSubj;
+
                 // Topic Renderer
                 doc.setTextColor(255, 255, 0); // Yellow
                 doc.text(topicLabel, cx + 1, ty);
@@ -518,35 +538,70 @@ const ErrorReport = ({ filters, setFilters }) => {
                     doc.text(line.text, cx + 1 + line.xOffset, ly);
                 });
                 doc.setDrawColor(255);
-                doc.line(cx + wSub, yPos, cx + wSub, yPos + headerH);
+                doc.line(cx + wSub, yPos, cx + wSub, yPos + headerH1);
                 cx += wSub;
 
                 // Details Column (Key)
-                // Line 1: Key
-                doc.setTextColor(255, 255, 0); // Yellow
+                doc.setTextColor(255, 255, 0);
                 doc.text(keyLabel, cx + 2, ty);
-                doc.setTextColor(255, 255, 255); // White
+                doc.setTextColor(255, 255, 255);
                 detailsLines.forEach((line, idx) => {
                     const ly = ty + (idx * lineHeight);
                     doc.text(line.text, cx + 2 + line.xOffset, ly);
                 });
+
+                // --- NEW HEADER ROW 2 ---
+                const yPos2 = yPos + headerH1;
+                doc.setDrawColor(255);
+                doc.line(margin, yPos2, margin + contentWidth, yPos2);
+
+                let cx2 = margin + wStat + wQ;
+                const ty2 = yPos2 + 4.5;
+                // w4 is already defined above
+
+                const renderSubCol = (label, lines, x, y) => {
+                    doc.setTextColor(255, 255, 0);
+                    doc.text(label, x + 1, y);
+                    doc.setTextColor(255, 255, 255);
+                    const lOffset = doc.getTextWidth(label);
+                    lines.forEach((line, idx) => {
+                        const ly = y + (idx * lineHeight);
+                        doc.text(line.text, x + 1 + line.xOffset, ly);
+                    });
+                };
+
+                renderSubCol("Type: ", typeLines, cx2, ty2);
+                doc.line(cx2 + w4, yPos2, cx2 + w4, yPos + headerH);
+                cx2 += w4;
+
+                renderSubCol("Src: ", sourceLines, cx2, ty2);
+                doc.line(cx2 + w4, yPos2, cx2 + w4, yPos + headerH);
+                cx2 += w4;
+
+                renderSubCol("O/R: ", orLines, cx2, ty2);
+                doc.line(cx2 + w4, yPos2, cx2 + w4, yPos + headerH);
+                cx2 += w4;
+
+                renderSubCol("Lvl: ", levelLines, cx2, ty2);
 
                 doc.setDrawColor(0);
                 doc.rect(margin, yPos, contentWidth, blockH);
 
                 doc.setFillColor(79, 129, 189);
                 doc.rect(margin, yPos + headerH, wStat, blockH - headerH, 'F');
+                // Removed rotated subject text per user request
 
                 doc.setTextColor(255);
-                const subTxt = String(q.Subject || '');
-                let fs = 9; doc.setFontSize(fs);
-                const maxSW = wStat - 2;
-                while (doc.getTextWidth(subTxt) > maxSW && fs > 4) {
-                    fs -= 0.5; doc.setFontSize(fs);
-                }
-                const scy = yPos + headerH + ((blockH - headerH) / 2);
-                // Rotate subject text to fit vertical bar
-                doc.text(subTxt, margin + (wStat / 2), scy, { align: 'center', angle: 90 });
+                // The subject text is now in the header row, so no need for rotated text here.
+                // const subTxt = String(q.Subject || '');
+                // let fs = 9; doc.setFontSize(fs);
+                // const maxSW = wStat - 2;
+                // while (doc.getTextWidth(subTxt) > maxSW && fs > 4) {
+                //     fs -= 0.5; doc.setFontSize(fs);
+                // }
+                // const scy = yPos + headerH + ((blockH - headerH) / 2);
+                // // Rotate subject text to fit vertical bar
+                // doc.text(subTxt, margin + (wStat / 2), scy, { align: 'center', angle: 90 });
 
                 const ibx = margin + wStat;
                 const iby = yPos + headerH;
@@ -823,14 +878,20 @@ const ErrorReport = ({ filters, setFilters }) => {
                                             <colgroup>
                                                 <col style={{ width: '15mm' }} />
                                                 <col style={{ width: '11mm' }} />
-                                                <col style={{ width: '72mm' }} />
-                                                <col style={{ width: '72mm' }} />
+                                                <col style={{ width: '30mm' }} />
+                                                <col style={{ width: '57mm' }} />
+                                                <col style={{ width: '57mm' }} />
                                                 <col style={{ width: '22mm' }} />
                                             </colgroup>
                                             <thead>
                                                 <tr style={{ backgroundColor: '#800000', color: 'white', fontSize: '11px', fontWeight: 'bold' }}>
                                                     <td style={{ border: '1px solid black', borderRight: '1px solid white', textAlign: 'center', height: '28px' }}>{q.W_U}</td>
                                                     <td style={{ border: '1px solid black', borderRight: '1px solid white', textAlign: 'center' }}>{q.Q_No}</td>
+
+                                                    <td style={{ border: '1px solid black', borderRight: '1px solid white', padding: '4px', verticalAlign: 'top' }}>
+                                                        <span style={{ color: '#FFFF00' }}>Sub: </span>
+                                                        <span style={{ color: 'white', marginLeft: '5px' }}>{q.Subject}</span>
+                                                    </td>
 
                                                     <td style={{ border: '1px solid black', borderRight: '1px solid white', padding: '4px', verticalAlign: 'top', wordWrap: 'break-word' }}>
                                                         <span style={{ color: '#FFFF00' }}>Topic: </span>
@@ -848,11 +909,28 @@ const ErrorReport = ({ filters, setFilters }) => {
                                                         </div>
                                                     </td>
                                                 </tr>
+                                                <tr style={{ backgroundColor: '#800000', color: 'white', fontSize: '11px', fontWeight: 'bold' }}>
+                                                    <td colSpan="2" style={{ border: '1px solid black', borderRight: '1px solid white', borderTop: '1px solid white' }}></td>
+                                                    <td style={{ border: '1px solid black', borderRight: '1px solid white', padding: '4px', borderTop: '1px solid white' }}>
+                                                        <span style={{ color: '#FFFF00' }}>Type: </span>
+                                                        <span style={{ color: 'white', marginLeft: '5px' }}>{q.Question_Type || '--'}</span>
+                                                    </td>
+                                                    <td style={{ border: '1px solid black', borderRight: '1px solid white', padding: '4px', borderTop: '1px solid white' }}>
+                                                        <span style={{ color: '#FFFF00' }}>Sources: </span>
+                                                        <span style={{ color: 'white', marginLeft: '5px' }}>{q.Sources || '--'}</span>
+                                                    </td>
+                                                    <td style={{ border: '1px solid black', padding: '4px', borderTop: '1px solid white' }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                            <span><span style={{ color: '#FFFF00' }}>O/R: </span>{q.Original_Replica || '--'}</span>
+                                                            <span style={{ marginLeft: '10px' }}><span style={{ color: '#FFFF00' }}>Level: </span>{q.Level || '--'}</span>
+                                                        </div>
+                                                    </td>
+                                                </tr>
                                             </thead>
                                             <tbody>
                                                 <tr>
                                                     <td style={{ backgroundColor: '#4F81BD', border: '1px solid black', verticalAlign: 'middle', textAlign: 'center', padding: '0 5px', color: 'white', fontWeight: 'bold', fontSize: '12px' }}>
-                                                        {q.Subject}
+                                                        <div style={{ transform: 'rotate(-90deg)', whiteSpace: 'nowrap' }}>{/* q.Subject - removed from vertical bar */}</div>
                                                     </td>
 
                                                     <td colSpan="4" style={{ padding: 0, border: '1px solid black' }}>
