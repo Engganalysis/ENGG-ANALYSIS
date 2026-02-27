@@ -141,16 +141,22 @@ function parseType2Header(header) {
     const testPart = parts[allIndiaIdx - 1];
     const batchPart = parts.slice(1, allIndiaIdx - 1).join('_');
 
-    // Transformation: Sr.Super-60_(Nucleus)_Jee Adv -> Sr.Super-60(N_Adv)
-    let transformedBatch = batchPart
-        .replace(/_\(Nucleus\)_Jee\s+/i, '(N_')
-        .replace(/Jee\s+Adv/i, 'Adv)')
-        .replace(/Jee\s+Mains/i, 'Mains)')
-        .replace(/Adv$/i, 'Adv)')
-        .replace(/Mains$/i, 'Mains)');
+    // Expected: 28-Sep-25_Jr.Super-60(Nucleus)_Jee Adv_WTA-12 & QAT-02_All India_Marks_Analysis
+    // Transformation goal: Jr.Super-60(N_Adv)
 
-    // Ensure trailing paren if we added (N_
-    if (transformedBatch.includes('(N_') && !transformedBatch.includes(')')) transformedBatch += ')';
+    // Find the institution name in parentheses
+    const parenMatch = batchPart.match(/\(([^)]+)\)/);
+    const institutionName = parenMatch ? parenMatch[1].trim() : "";
+    const firstLetter = institutionName.charAt(0).toUpperCase() || "N";
+
+    // Detect Adv or Mains from the whole header
+    const upperHeader = header.toUpperCase();
+    const isAdv = upperHeader.includes('JEE ADV') || upperHeader.includes('JEE-ADV') || upperHeader.includes('JEE(ADV)');
+    const isMains = upperHeader.includes('JEE MAIN') || upperHeader.includes('JEE-MAIN') || upperHeader.includes('JEE(MAIN)');
+    const typeLabel = isAdv ? 'Adv' : (isMains ? 'Mains' : '');
+    const prefix = batchPart.split('(')[0].replace(/_$/, '').trim();
+
+    const transformedBatch = `${prefix}(${firstLetter}${typeLabel ? '_' + typeLabel : ''})`;
 
     let testName = testPart;
     let p1Name = testPart, p2Name = "";
@@ -285,14 +291,16 @@ async function processResultFile(filePath, pool, topIds, allowedCampuses, proces
 
     // Convert Date to YYYY-MM-DD for TiDB
     let dbDate = formatDateToSQL(dateStr);
-
     // Cross-file deduplication
+    // Cross-file deduplication (Delete ONLY once per group in a run)
     const groupKey = `${testName}|${dbDate}|${batch}`;
-    if (processedGroups.has(groupKey)) {
-        console.log(`  [SKIP] Duplicate data group already processed for: ${groupKey}`);
-        return;
+    if (!processedGroups.has(groupKey)) {
+        console.log(`  [CLEAN] Clearing existing data for group: ${groupKey}`);
+        const safeTest = testName.replace(/'/g, "''");
+        const safeBatch = batch.replace(/'/g, "''");
+        await pool.request().query(`DELETE FROM ENGG_RESULT WHERE Test = '${safeTest}' AND DATE = '${dbDate}' AND Batch = '${safeBatch}'`);
+        processedGroups.add(groupKey);
     }
-    processedGroups.add(groupKey);
 
     const hRow8 = data[headerRowIdx] || [];
     const hRow9 = data[headerRowIdx + 1] || [];
@@ -454,13 +462,7 @@ async function processResultFile(filePath, pool, topIds, allowedCampuses, proces
 
     // Upload in Batches
     if (studentsToUpload.length > 0) {
-        // Clear old data for same Test + Batch to avoid dups if re-running
-        // Or user said "STUD_ID only as TOP", and "extract data from that campus names only"
-        // I'll use REPLACE INTO if the table has a primary key, but I'll do manual delete + insert to be safe
-        // Actually, just delete existing for this Test, Date, Batch to keep it clean.
-        const safeTest = testName.replace(/'/g, "''");
-        const safeBatch = batch.replace(/'/g, "''");
-        await pool.request().query(`DELETE FROM ENGG_RESULT WHERE Test = '${safeTest}' AND DATE = '${dbDate}' AND Batch = '${safeBatch}'`);
+        // Deduplication is now handled at the row level via WHERE NOT EXISTS
 
         const BATCH_SIZE = 100;
         for (let i = 0; i < studentsToUpload.length; i += BATCH_SIZE) {
@@ -497,14 +499,13 @@ async function processType2(filePath, data, info, pool, topIds, allowedCampuses,
     const dbDate = formatDateToSQL(dateStr);
 
     console.log(`  Identified Type 2 Metadata: Batch=[${batch}], Date=[${dbDate}], Test=[${testName}]`);
-
-    // Cross-file deduplication
+    // Cross-file deduplication (Delete ONLY once per group in a run)
     const groupKey = `${testName}|${dbDate}|${batch}`;
-    if (processedGroups.has(groupKey)) {
-        console.log(`  [SKIP] Duplicate data group already processed for: ${groupKey}`);
-        return;
+    if (!processedGroups.has(groupKey)) {
+        console.log(`  [CLEAN] Clearing existing data for group: ${groupKey}`);
+        await pool.request().query(`DELETE FROM ENGG_RESULT WHERE Test = '${testName.replace(/'/g, "''")}' AND DATE = '${dbDate}' AND Batch = '${batch.replace(/'/g, "''")}'`);
+        processedGroups.add(groupKey);
     }
-    processedGroups.add(groupKey);
 
     // Find Header Row (where TOT is)
     let headerRowIdx = -1;
@@ -711,14 +712,9 @@ async function processType2(filePath, data, info, pool, topIds, allowedCampuses,
 async function uploadStudents(students, pool) {
     if (students.length === 0) return;
 
-    // Use a unique set of Test + Date + Batch to delete existing
+    // Unique set of Test + Date + Batch
     const uniqueGroups = new Set();
     students.forEach(s => uniqueGroups.add(`${s.Test}|${s.DATE}|${s.Batch}`));
-
-    for (const group of uniqueGroups) {
-        const [t, d, b] = group.split('|');
-        await pool.request().query(`DELETE FROM ENGG_RESULT WHERE Test = '${t.replace(/'/g, "''")}' AND DATE = '${d}' AND Batch = '${b.replace(/'/g, "''")}'`);
-    }
 
     const BATCH_SIZE = 100;
     for (let i = 0; i < students.length; i += BATCH_SIZE) {

@@ -101,11 +101,22 @@ const ErrorReport = ({ filters, setFilters }) => {
             const processed = Object.values(grouped).map(student => {
                 let testsArr = Object.values(student.tests);
 
-                // Sort Tests by Date (Latest First)
+                // Sort Tests: Latest First, then WTA/WTM priority
                 testsArr.sort((a, b) => {
                     const d1 = new Date(a.meta.date);
                     const d2 = new Date(b.meta.date);
-                    return d2 - d1;
+                    if (d2 - d1 !== 0) return d2 - d1;
+
+                    const nameA = String(a.meta.testName).toUpperCase();
+                    const nameB = String(b.meta.testName).toUpperCase();
+
+                    const isA_Priority = nameA.startsWith('WTA') || nameA.startsWith('WTM');
+                    const isB_Priority = nameB.startsWith('WTA') || nameB.startsWith('WTM');
+
+                    if (isA_Priority && !isB_Priority) return -1;
+                    if (!isA_Priority && isB_Priority) return 1;
+
+                    return nameA.localeCompare(nameB);
                 });
 
                 // Sort Questions by Subject then QNo

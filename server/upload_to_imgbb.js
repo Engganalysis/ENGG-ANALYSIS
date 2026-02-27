@@ -37,6 +37,11 @@ async function uploadToImgBB() {
         console.warn("[WARN] Could not read Row 3 from Excel, falling back to filename.");
     }
 
+    // Expected: 29-Jun-25_Jr.Super-60(Nucleus)_Jee Adv_WTA-12 & QAT-02_All India_Marks_Analysis
+    const parts = sourceText.split('_');
+    const allIndiaIdx = parts.findIndex(p => p.toUpperCase().includes('ALL INDIA'));
+    const testName = (allIndiaIdx > 0) ? parts[allIndiaIdx - 1] : "Test";
+
     // Pattern -> Sr/Jr.Super-60([FirstLetter]_[Adv/Mains])
     const baseMatch = sourceText.match(/(?:Sr|Jr)\.[^(_]*/i);
     const prefix = baseMatch ? baseMatch[0].trim() : (sourceText.split('_')[1] || "Batch");
@@ -48,7 +53,7 @@ async function uploadToImgBB() {
     const isMains = sourceText.toUpperCase().includes('MAIN');
     const typeLabel = isAdv ? 'Adv' : (isMains ? 'Mains' : '');
 
-    const ALBUM_NAME = `${prefix}(${firstLetter}${typeLabel ? '_' + typeLabel : ''})`;
+    const ALBUM_NAME = `${prefix}(${firstLetter}${typeLabel ? '_' + typeLabel : ''}) - ${testName}`;
 
     // Dynamic Pics Folder Detection
     const picsBaseDir = path.join(ERP_BASE, 'PICS');
@@ -74,6 +79,7 @@ async function uploadToImgBB() {
         const mappingPath = path.join(__dirname, 'url_mapping.json');
         let session = {
             album: ALBUM_NAME,
+            test: testName,
             mapping: {
                 P1: { Q: {}, S: {} },
                 P2: { Q: {}, S: {} }
@@ -83,12 +89,13 @@ async function uploadToImgBB() {
         if (fs.existsSync(mappingPath)) {
             try {
                 const existing = JSON.parse(fs.readFileSync(mappingPath, 'utf8'));
-                // If it's the SAME album, we reuse the mapping. If NEW album, we clear it!
-                if (existing.album === ALBUM_NAME) {
+                // If it's the SAME album and test, we reuse the mapping. If NEW, we clear it!
+                if (existing.album === ALBUM_NAME && (!existing.test || existing.test === testName)) {
                     session = existing;
-                    console.log(`[CACHE] Reusing existing mapping for album: ${ALBUM_NAME}`);
+                    session.test = testName; // Ensure test is set if missing
+                    console.log(`[CACHE] Reusing existing mapping for album/test: ${ALBUM_NAME}`);
                 } else {
-                    console.log(`[NEW] New batch detected (${ALBUM_NAME}). Clearing old mapping of (${existing.album || 'Unknown'}).`);
+                    console.log(`[NEW] New test/batch detected (${ALBUM_NAME}). Clearing old mapping of (${existing.album || 'Unknown'}).`);
                     // session remains fresh with empty mapping
                 }
             } catch (e) {

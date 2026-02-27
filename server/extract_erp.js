@@ -1,7 +1,6 @@
-const XLSX = require('xlsx');
 const fs = require('fs');
 const path = require('path');
-const readline = require('readline-sync');
+const XLSX = require('xlsx');
 const { connectToDb } = require('./db');
 
 // --- Configuration ---
@@ -203,14 +202,25 @@ function parseMarksFile(filePath) {
         CAMPUS: findCol(/^Campus/i)
     };
 
+    console.log(`    [DEBUG] Base columns: ID=${baseCols.STUD_ID}, Name=${baseCols.NAME}, Campus=${baseCols.CAMPUS}`);
+
     const blocks = [];
     for (let c = 0; c < r8.length; c++) {
         if (String(r8[c]).trim().toUpperCase() === 'TOT') {
-            const label = String(r9[c] || '').trim().toUpperCase().replace(/\s+/g, '');
+            let label = String(r9[c] || '').trim().toUpperCase().replace(/\s+/g, '');
+            // Handle "P1+P2" or similar by taking substrings if it's the TOT column for a specific paper
             if (label === 'P1' || label === 'P2') {
                 blocks.push({ label, startCol: c });
+            } else if (label.includes('P1') && !label.includes('P2')) {
+                blocks.push({ label: 'P1', startCol: c });
+            } else if (label.includes('P2') && !label.includes('P1')) {
+                blocks.push({ label: 'P2', startCol: c });
             }
         }
+    }
+
+    if (blocks.length === 0) {
+        console.warn("    [WARN] No P1 or P2 blocks identified in marks sheet. Checking for P1 + P2 combined logic...");
     }
 
     const marksMap = { P1: {}, P2: {} };
@@ -288,22 +298,20 @@ function parseFilenameInfo(filePath, sourceText) {
     const testType = testPart.split('-')[0]; // RPTA
 
     // Batch extraction: Pattern -> Sr/Jr.Super-60([FirstLetter]_[Adv/Mains])
-    let batchNameRaw = "Batch";
+    // Pattern: Jr.Super-60(N_Adv)
     const baseMatch = text.match(/(?:Sr|Jr)\.[^(_]*/i);
     let prefix = baseMatch ? baseMatch[0].trim() : (parts[1] || "Batch");
 
-    // Find the word in parentheses (like Nucleus or Sterling)
+    // Letter (N) from paren match, Type (Adv/Mains) from JEE match
     const parenMatch = text.match(/\(([^)]+)\)/);
-    const firstLetter = parenMatch ? parenMatch[1].trim().charAt(0).toUpperCase() : "N"; // Default to N for Nucleus
+    const institutionName = parenMatch ? parenMatch[1].trim() : "";
+    const firstLetter = institutionName.charAt(0).toUpperCase() || "N";
 
-    // Detect Adv or Mains
     const isAdv = text.toUpperCase().includes('ADV');
     const isMains = text.toUpperCase().includes('MAIN');
     const typeLabel = isAdv ? 'Adv' : (isMains ? 'Mains' : '');
 
-    // Pattern fix: Jr.Super-60 -> Jr.Super60
-    // prefix = prefix.replace(/-60$/, '60').replace(/-120$/, '120');
-
+    // The user wants Jr.Super-60(N_Adv)
     const batch = `${prefix}(${firstLetter}${typeLabel ? '_' + typeLabel : ''})`;
 
     return { date: dateStr, batch, test: testPart, testType, batchRaw: prefix, firstLetter };
@@ -356,35 +364,12 @@ async function processPaper(pool, label, qErrorPath, marksData, topIds, generalI
     // Ask if meta is missing (0) OR clearly incomplete (e.g. < 5 entries when paper is large)
     const isIncomplete = metaCount > 0 && metaCount < 5 && qCols.length > 10;
 
-    if (!manualMapping && (metaCount === 0 || isIncomplete)) {
+    if (metaCount === 0 || isIncomplete) {
         if (isIncomplete) {
-            console.log(`\n[!] ZERO REPORT for ${testInfo.test} (${label}) seems INCOMPLETE (Only ${metaCount} topics found).`);
+            console.log(`    [INFO] ZERO REPORT for ${testInfo.test} (${label}) seems INCOMPLETE. Using partial results + fallback.`);
         } else {
-            console.log(`\n[!] ZERO REPORT MISSING for ${testInfo.test} (${label})`);
+            console.warn(`    [WARN] ZERO REPORT MISSING for ${testInfo.test} (${label}). Using 1/3 split fallback.`);
         }
-
-        console.log(`[!] Available Questions: 1 to ${qCols.length}`);
-        const setManual = readline.keyInYNStrict("Would you like to manually set Subject Ranges for this test?");
-
-        if (setManual) {
-            manualMapping = {};
-            const subjects = ['MATHS', 'PHYSICS', 'CHEMISTRY'];
-            for (const sub of subjects) {
-                console.log(`\nConfiguring range for: ${sub}`);
-                const start = parseInt(readline.question(`  Start QNo: `));
-                const end = parseInt(readline.question(`  End QNo: `));
-                if (!isNaN(start) && !isNaN(end)) {
-                    for (let q = start; q <= end; q++) manualMapping[q] = sub;
-                }
-            }
-            // Save to cache
-            manualMappingCache[cacheKey] = manualMapping;
-        } else {
-            // Store empty object to not ask again for this test if user said No
-            manualMappingCache[cacheKey] = {};
-        }
-    } else if (manualMapping && Object.keys(manualMapping).length > 0) {
-        console.log(`    [INFO] Using cached subject mapping for ${testInfo.test} (${label})`);
     }
 
     console.log(`    [DEBUG] Metadata Loaded -> Keys: ${Object.keys(keys).length}, Errors Info: ${Object.keys(metaData).length}`);
@@ -433,24 +418,15 @@ async function processPaper(pool, label, qErrorPath, marksData, topIds, generalI
         let targetType = "";
 
         if (mode === 'TOP') {
-            if (!isTop) {
-                console.debug(`    [Filter] Student ${studId} skipped: not in Top_Students config.`);
-                continue;
-            }
+            if (!isTop) continue;
             targetType = "TOP";
         } else if (mode === 'ALL') {
-            if (!isGeneral) {
-                console.debug(`    [Filter] Student ${studId} skipped: not in All_Students config.`);
-                continue;
-            }
+            if (!isGeneral) continue;
             targetType = "ALL";
         } else if (mode === 'BOTH') {
             if (isTop) targetType = "TOP";
             else if (isGeneral) targetType = "ALL";
-            else {
-                console.debug(`    [Filter] Student ${studId} skipped: not in any ID list in BOTH mode.`);
-                continue;
-            }
+            else continue;
         }
 
         for (const q of qCols) {
@@ -481,10 +457,10 @@ async function processPaper(pool, label, qErrorPath, marksData, topIds, generalI
                     STUD_ID: parseInt(studId),
                     Student_Name: studentMarks.Student_Name,
                     Branch: normalizeCampus(studentMarks.Branch), // Normalized campus
-                    Batch: testInfo.batch, // Re-added Batch
-                    Exam_Date: dbDate, // Date
-                    Test_Type: specificTest.split('-')[0], // Extract type from local test name
-                    Test: specificTest, // Specific test name (e.g. CTA-09 for P2)
+                    Batch: testInfo.batch,
+                    Exam_Date: dbDate,
+                    Test_Type: specificTest.split('-')[0],
+                    Test: specificTest,
                     TOT: studentMarks.TOT,
                     TOT_P: studentMarks.TOT_P,
                     AIR: studentMarks.AIR,
@@ -497,8 +473,8 @@ async function processPaper(pool, label, qErrorPath, marksData, topIds, generalI
                     CHE: studentMarks.CHE,
                     CHE_R: studentMarks.CHE_R,
                     CHE_P: studentMarks.CHE_P,
-                    Q_No: parseInt(qNo), // int
-                    W_U: val, // text
+                    Q_No: parseInt(qNo),
+                    W_U: val,
                     Q_URL: (urlMapping.mapping ? urlMapping.mapping[label]?.Q?.[qNo] : (urlMapping[label]?.Q?.[qNo] || '')) || '',
                     S_URL: (urlMapping.mapping ? urlMapping.mapping[label]?.S?.[qNo] : (urlMapping[label]?.S?.[qNo] || DEFAULT_S_URL)) || DEFAULT_S_URL,
                     Key_Value: keys[qNo] || '',
@@ -514,9 +490,6 @@ async function processPaper(pool, label, qErrorPath, marksData, topIds, generalI
                     P1_P2: label
                 });
 
-                // Correcting URL lookup if new session-aware structure exists
-                // The structure is urlMapping[albumName][label][Q/S][qNo]
-                // We need to find if any key in urlMapping matches the marks file name pattern
                 const albumName = Object.keys(urlMapping).find(k => k.includes(testInfo.firstLetter) && (k.includes('.xlsx') || k.includes('.xls')));
                 if (albumName && urlMapping[albumName] && urlMapping[albumName][label]) {
                     const rowEntry = rowsToUpload[rowsToUpload.length - 1];
