@@ -401,6 +401,8 @@ const ErrorReport = ({ filters, setFilters }) => {
                 const sImg = await loadImage(q.S_URL);
 
                 // Adjusted Widths - Merged Key/Perc, More space for Subs
+                const wStat = 15; // W/U
+                const wQ = 11;    // Q No
                 const wSubj = 30; // Subject
                 const wDetails = 22; // Key
 
@@ -433,12 +435,16 @@ const ErrorReport = ({ filters, setFilters }) => {
                 const detailsLines = getSmartWrappedLines(doc, keyVal, wDetails - 2, keyLabelW);
                 const detailsH = Math.max(2, detailsLines.length) * 4;
 
-                // New Row Header Lines
-                const w4_header = (contentWidth) / 4;
-                const typeLines = getSmartWrappedLines(doc, q.Question_Type || '--', w4_header - 2, doc.getTextWidth("Type: "));
-                const sourceLines = getSmartWrappedLines(doc, q.Sources || '--', w4_header - 2, doc.getTextWidth("Src: "));
-                const orLines = getSmartWrappedLines(doc, q.Original_Replica || '--', w4_header - 2, doc.getTextWidth("O/R: "));
-                const levelLines = getSmartWrappedLines(doc, q.Level || '--', w4_header - 2, doc.getTextWidth("Lvl: "));
+                // Proportional Row 2 Header Widths
+                const wType = contentWidth * 0.40;  // 40% for Type (long)
+                const wSrc = contentWidth * 0.20;   // 20%
+                const wOR = contentWidth * 0.20;    // 20% (shorter)
+                const wLvl = contentWidth * 0.20;   // 20%
+
+                const typeLines = getSmartWrappedLines(doc, q.Question_Type || '--', wType - 2, doc.getTextWidth("Type: "));
+                const sourceLines = getSmartWrappedLines(doc, q.Sources || '--', wSrc - 2, doc.getTextWidth("Src: "));
+                const orLines = getSmartWrappedLines(doc, q.Original_Replica || '--', wOR - 2, doc.getTextWidth("O/R: "));
+                const levelLines = getSmartWrappedLines(doc, q.Level || '--', wLvl - 2, doc.getTextWidth("Lvl: "));
 
                 const maxHeaderLines1 = Math.max(2, topicLines.length, subLines.length, detailsLines.length);
                 const maxHeaderLines2 = Math.max(2, typeLines.length, sourceLines.length, orLines.length, levelLines.length);
@@ -546,16 +552,16 @@ const ErrorReport = ({ filters, setFilters }) => {
                 const w4 = contentWidth / 4; // Use full width
 
                 renderSubCol("Type: ", typeLines, cx2, ty2);
-                doc.line(cx2 + w4_header, yPos2, cx2 + w4_header, yPos + headerH);
-                cx2 += w4_header;
+                doc.line(cx2 + wType, yPos2, cx2 + wType, yPos + headerH);
+                cx2 += wType;
 
                 renderSubCol("Src: ", sourceLines, cx2, ty2);
-                doc.line(cx2 + w4_header, yPos2, cx2 + w4_header, yPos + headerH);
-                cx2 += w4_header;
+                doc.line(cx2 + wSrc, yPos2, cx2 + wSrc, yPos + headerH);
+                cx2 += wSrc;
 
                 renderSubCol("O/R: ", orLines, cx2, ty2);
-                doc.line(cx2 + w4_header, yPos2, cx2 + w4_header, yPos + headerH);
-                cx2 += w4_header;
+                doc.line(cx2 + wOR, yPos2, cx2 + wOR, yPos + headerH);
+                cx2 += wOR;
 
                 renderSubCol("Lvl: ", levelLines, cx2, ty2);
 
@@ -869,7 +875,7 @@ const ErrorReport = ({ filters, setFilters }) => {
                                                     </td>
                                                 </tr>
                                                 <tr style={{ backgroundColor: '#800000', color: 'white', fontSize: '11px', fontWeight: 'bold' }}>
-                                                    <td colSpan="2" style={{ border: '1px solid black', borderRight: '1px solid white', borderTop: '1px solid white', padding: '4px' }}>
+                                                    <td colSpan="3" style={{ border: '1px solid black', borderRight: '1px solid white', borderTop: '1px solid white', padding: '4px' }}>
                                                         <span style={{ color: '#FFFF00' }}>Type: </span>
                                                         <span style={{ color: 'white', marginLeft: '5px' }}>{q.Question_Type || '--'}</span>
                                                     </td>
@@ -877,7 +883,7 @@ const ErrorReport = ({ filters, setFilters }) => {
                                                         <span style={{ color: '#FFFF00' }}>Sources: </span>
                                                         <span style={{ color: 'white', marginLeft: '5px' }}>{q.Sources || '--'}</span>
                                                     </td>
-                                                    <td colSpan="2" style={{ border: '1px solid black', borderRight: '1px solid white', padding: '4px', borderTop: '1px solid white' }}>
+                                                    <td style={{ border: '1px solid black', borderRight: '1px solid white', padding: '4px', borderTop: '1px solid white' }}>
                                                         <span style={{ color: '#FFFF00' }}>O/R: </span>
                                                         <span style={{ color: 'white', marginLeft: '5px' }}>{q.Original_Replica || '--'}</span>
                                                     </td>

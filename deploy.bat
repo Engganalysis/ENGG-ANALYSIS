@@ -1,7 +1,7 @@
 @echo off
 title Engineering Analysis - Full Deploy
-set /p msg="Enter commit message: "
-if "%msg%"=="" set msg="Update Engineering Analysis"
+:: Automated commit message based on recent Error Analysis improvements
+set "msg=Fix: Improved Error Analysis Report (Headers, Image Scaling, and Subject Mapping)"
 
 echo.
 echo === [1/4] Adding and Committing changes ===
