@@ -614,12 +614,57 @@ function loadKeys(filePath) {
     if (!fs.existsSync(filePath)) return {};
     const wb = XLSX.readFile(filePath);
     const ws = wb.Sheets[wb.SheetNames[0]];
-    const data = XLSX.utils.sheet_to_json(ws);
+    // header: 1 gives us a 2D array to find the header row
+    const raw = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+    let headerIdx = -1;
+    let qColName = 'Q_No'; // default
+    let keyColName = 'Key'; // default
+
+    for (let i = 0; i < raw.length; i++) {
+        const row = raw[i];
+        if (!row) continue;
+        const qIdx = row.findIndex(c => {
+            const s = String(c || '').trim().toUpperCase();
+            return s === 'Q_NO' || s === 'Q.NO' || s === 'QNO' || s === 'QUESTION' || s === 'Q. NO';
+        });
+        const kIdx = row.findIndex(c => {
+            const s = String(c || '').trim().toUpperCase();
+            return s === 'KEY' || s === 'ANSWER' || s === 'CORRECT KEY';
+        });
+
+        if (qIdx !== -1 && kIdx !== -1) {
+            headerIdx = i;
+            qColName = row[qIdx];
+            keyColName = row[kIdx];
+            break;
+        }
+    }
+
     const keys = {};
-    data.forEach(r => {
-        const qNo = String(r['Q_No'] || '').trim();
-        if (qNo) keys[qNo] = String(r['Key'] || '').trim();
-    });
+    if (headerIdx !== -1) {
+        const data = XLSX.utils.sheet_to_json(ws, { range: headerIdx });
+        data.forEach(r => {
+            let qNoRaw = r[qColName];
+            if (qNoRaw === undefined || qNoRaw === null) return;
+
+            // Normalize QNo to string integer (so "1" matches "01")
+            const qNo = String(parseInt(qNoRaw, 10));
+            if (qNo !== 'NaN') {
+                keys[qNo] = String(r[keyColName] || '').trim();
+            }
+        });
+    } else {
+        // Fallback to old method if no header found
+        const data = XLSX.utils.sheet_to_json(ws);
+        data.forEach(r => {
+            const qNoRaw = r['Q_No'] || r['Q.No'] || r['QNo'] || r['Q. No'];
+            if (qNoRaw) {
+                const qNo = String(parseInt(qNoRaw, 10));
+                keys[qNo] = String(r['Key'] || '').trim();
+            }
+        });
+    }
     return keys;
 }
 

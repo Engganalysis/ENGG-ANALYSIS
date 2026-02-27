@@ -549,7 +549,16 @@ const ErrorReport = ({ filters, setFilters }) => {
 
                 let cx2 = margin; // Start from margin
                 const ty2 = yPos2 + 4.5;
-                const w4 = contentWidth / 4; // Use full width
+
+                const renderSubCol = (label, lines, x, y) => {
+                    doc.setTextColor(255, 255, 0);
+                    doc.text(label, x + 1, y);
+                    doc.setTextColor(255, 255, 255);
+                    lines.forEach((line, idx) => {
+                        const ly = y + (idx * lineHeight);
+                        doc.text(line.text, x + 1 + line.xOffset, ly);
+                    });
+                };
 
                 renderSubCol("Type: ", typeLines, cx2, ty2);
                 doc.line(cx2 + wType, yPos2, cx2 + wType, yPos + headerH);
