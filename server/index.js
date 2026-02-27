@@ -589,6 +589,8 @@ app.get('/api/erp/filters', async (req, res) => {
             pool.request().query(topQuery)
         ]);
 
+        console.log(`[ERP Filters] Found Campuses: ${branchesRes.recordset.length}, Streams: ${streamsRes.recordset.length}`);
+
         res.json({
             campuses: (branchesRes.recordset || []).map(r => r.Result).filter(Boolean),
             streams: (streamsRes.recordset || []).map(r => r.Result).filter(Boolean),
@@ -606,8 +608,9 @@ app.get('/api/erp/filters', async (req, res) => {
 app.get('/api/erp/students', async (req, res) => {
     try {
         const pool = await connectToDb();
-        const { campus, stream, test, testType, topAll, quickSearch } = req.query;
+        const { quickSearch, campus, stream, test, testType, topAll, TOP_ALL } = req.query;
 
+        // Helper to add clauses
         let clauses = [];
         const addClause = (field, value) => {
             if (!value || value === 'All' || value === '__ALL__') return;
@@ -617,32 +620,34 @@ app.get('/api/erp/students', async (req, res) => {
             clauses.push(`UPPER(TRIM(${field})) IN (${cleanValues.map(v => `'${v}'`).join(',')})`);
         };
 
-        // Map filters to ERP columns
+        // Apply Filters
         addClause('Branch', campus);
         addClause('Batch', stream);
         addClause('Test', test);
         addClause('Test_Type', testType);
-        addClause('Top_ALL', topAll);
+
+        // Handle Top_ALL
+        const finalTopAll = topAll || TOP_ALL;
+        addClause('Top_ALL', finalTopAll);
 
         if (quickSearch && quickSearch.trim() !== '') {
             const safeSearch = quickSearch.trim().replace(/'/g, "''").toUpperCase();
             clauses.push(`(UPPER(TRIM(Student_Name)) LIKE '%${safeSearch}%' OR UPPER(TRIM(STUD_ID)) LIKE '%${safeSearch}%')`);
         }
 
-        const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+        const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : "WHERE 1=1";
 
         const query = `
             SELECT 
                 TRIM(STUD_ID) as id, 
                 MAX(TRIM(Student_Name)) as name,
                 MAX(TRIM(Branch)) as campus,
-                GROUP_CONCAT(DISTINCT TRIM(Batch) SEPARATOR ',') as stream
+                MAX(TRIM(Batch)) as stream
             FROM ERP_REPORT_ENGG 
-            ${where} 
+            ${whereClause} 
             GROUP BY STUD_ID
             ORDER BY name
-            LIMIT 100
-        `;
+            LIMIT 100`;
 
         const result = await pool.request().query(query);
         res.json(result.recordset);
@@ -808,60 +813,6 @@ app.post('/api/notify-registration', async (req, res) => {
     }
 });
 
-// Get ERP Students for Search with Cascading Filters
-app.get('/api/erp/students', async (req, res) => {
-    try {
-        const pool = await connectToDb();
-        const { quickSearch, campus, stream, test, testType, topAll, TOP_ALL } = req.query;
-
-        // Helper to add clauses
-        let clauses = [];
-        const addClause = (field, value) => {
-            if (!value || value === 'All' || value === '__ALL__') return;
-            const valArray = Array.isArray(value) ? value : [value];
-            const cleanValues = valArray.map(v => v ? v.toString().trim().toUpperCase().replace(/'/g, "''") : '').filter(Boolean);
-            if (cleanValues.length === 0) return;
-            clauses.push(`UPPER(TRIM(${field})) IN (${cleanValues.map(v => `'${v}'`).join(',')})`);
-        };
-
-        // Apply Filters
-        addClause('Branch', campus);
-        addClause('Batch', stream);
-        addClause('Test', test);
-        addClause('Test_Type', testType);
-
-        // Handle Top_ALL (check both parameter names just in case)
-        const finalTopAll = topAll || TOP_ALL;
-        addClause('Top_ALL', finalTopAll);
-
-        if (quickSearch && quickSearch.trim() !== '') {
-            const safeSearch = quickSearch.trim().replace(/'/g, "''").toUpperCase();
-            clauses.push(`(UPPER(TRIM(Student_Name)) LIKE '%${safeSearch}%' OR UPPER(TRIM(STUD_ID)) LIKE '%${safeSearch}%')`);
-        }
-
-        const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : "WHERE 1=1";
-
-        console.log(`[ERP Students] Filtering with: ${whereClause}`);
-
-        const query = `
-            SELECT 
-                TRIM(STUD_ID) as id, 
-                MAX(TRIM(Student_Name)) as name,
-                MAX(TRIM(Branch)) as campus,
-                MAX(TRIM(Batch)) as stream
-            FROM ERP_REPORT_ENGG 
-            ${whereClause} 
-            GROUP BY STUD_ID
-            ORDER BY name
-            LIMIT 100`;
-
-        const result = await pool.request().query(query);
-        res.json(result.recordset);
-    } catch (err) {
-        console.error("[ERP Students] ERROR:", err);
-        res.status(500).send(err.message);
-    }
-});
 
 // SERVE REACT APP FOR ANY OTHER ROUTE
 // app.get('*', (req, res) => {

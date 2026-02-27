@@ -338,7 +338,7 @@ const ErrorReport = ({ filters, setFilters }) => {
             doc.setTextColor(0);
             if (bookmanBoldFont) doc.setFont("Bookman", "bold");
             else doc.setFont("helvetica", "bold");
-            const testTitle = `${test.meta.date}_${student.info.stream}_${test.meta.testName}_Error Analysis`;
+            const testTitle = `${formatDate(test.meta.date)}_${student.info.stream}_${test.meta.testName}_Error Analysis`;
             doc.text(testTitle, pageWidth / 2, yPos + 6, { align: 'center' });
             yPos += 12;
 
@@ -348,10 +348,10 @@ const ErrorReport = ({ filters, setFilters }) => {
                 yPos = 15;
             }
             const colDefs = [
-                { name: "Test", w: 25, bg: [255, 255, 255] },
-                { name: "Date", w: 25, bg: [255, 255, 255] },
-                { name: "TOT", w: 14, bg: [255, 255, 204] },
-                { name: "AIR", w: 14, bg: [255, 255, 255] },
+                { name: "Test", w: 26, bg: [255, 255, 255] },
+                { name: "Date", w: 26, bg: [255, 255, 255] },
+                { name: "TOT", w: 15, bg: [255, 255, 204] },
+                { name: "AIR", w: 15, bg: [255, 255, 255] },
                 { name: "MAT", w: 18, bg: [253, 233, 217] },
                 { name: "Rank", w: 18, bg: [253, 233, 217] },
                 { name: "PHY", w: 18, bg: [235, 241, 222] },
@@ -361,7 +361,7 @@ const ErrorReport = ({ filters, setFilters }) => {
             ];
 
             const values = [
-                test.meta.testName, test.meta.date,
+                test.meta.testName, formatDate(test.meta.date),
                 test.meta.tot, test.meta.air,
                 test.meta.mat, test.meta.m_rank,
                 test.meta.phy, test.meta.p_rank,
@@ -438,10 +438,10 @@ const ErrorReport = ({ filters, setFilters }) => {
                 const lineHeight = 4;
                 const headerH = Math.max(9, (maxHeaderLines * lineHeight) + 3);
 
-                const imgTargetW = 85;
+                const imgTargetW = 170; // Set to fit content width
                 let qH = 0; if (qImg) qH = (qImg.height / qImg.width) * imgTargetW;
                 let sH = 0; if (sImg) sH = (sImg.height / sImg.width) * imgTargetW;
-                let maxContentH = Math.max(qH, sH, 20);
+                let maxContentH = qH + sH + 5; // Stacked height
                 let blockH = headerH + maxContentH + 2;
 
                 // --- Intelligent Page Break & Image Sizing ---
@@ -545,28 +545,26 @@ const ErrorReport = ({ filters, setFilters }) => {
                     fs -= 0.5; doc.setFontSize(fs);
                 }
                 const scy = yPos + headerH + ((blockH - headerH) / 2);
-                doc.text(subTxt, margin + (wStat / 2), scy + (fs / 3), { align: 'center' });
+                // Rotate subject text to fit vertical bar
+                doc.text(subTxt, margin + (wStat / 2), scy, { align: 'center', angle: 90 });
 
                 const ibx = margin + wStat;
                 const iby = yPos + headerH;
                 doc.setDrawColor(0);
                 doc.line(ibx + halfImgW, iby, ibx + halfImgW, yPos + blockH);
 
-                const drwImg = (img, x, y, h) => {
+                const drwImg = (img, x, y, w, h) => {
                     if (!img) return;
-                    const asp = img.width / img.height;
-                    let w = h * asp;
-                    const offX = (halfImgW - w) / 2;
-                    try { doc.addImage(img, 'PNG', x + offX, y + 1, w, h); } catch (e) { }
+                    try { doc.addImage(img, 'PNG', x + 2, y + 1, w, h); } catch (e) { }
                 };
 
-                if (qImg) drwImg(qImg, ibx, iby, qH);
+                if (qImg) drwImg(qImg, ibx, iby, imgTargetW - 4, qH);
                 else {
                     doc.setTextColor(150); doc.setFontSize(8);
                     doc.text("No Q Image", ibx + 5, iby + 5);
                 }
 
-                if (sImg) drwImg(sImg, ibx + halfImgW, iby, sH);
+                if (sImg) drwImg(sImg, ibx, iby + qH + 2, imgTargetW - 4, sH);
 
                 yPos += blockH;
             }
@@ -771,7 +769,7 @@ const ErrorReport = ({ filters, setFilters }) => {
                             return (
                                 <div key={tIdx} style={{ marginBottom: '30px' }}>
                                     <h2 style={{ textAlign: 'center', color: '#000', fontSize: '18px', fontWeight: 'bold', marginBottom: '15px' }}>
-                                        {test.meta.date}_{student.info.stream}_{test.meta.testName}_Error Analysis
+                                        {formatDate(test.meta.date)}_{student.info.stream}_{test.meta.testName}_Error Analysis
                                     </h2>
                                     {/* Score Table */}
                                     <div style={{ overflowX: 'auto' }}>
@@ -779,16 +777,14 @@ const ErrorReport = ({ filters, setFilters }) => {
                                             <colgroup>
                                                 <col style={{ width: '13.15%' }} />
                                                 <col style={{ width: '13.15%' }} />
-                                                <col style={{ width: '7.36%' }} />
-                                                <col style={{ width: '7.36%' }} />
-                                                <col style={{ width: '7.36%' }} />
-                                                <col style={{ width: '7.36%' }} />
-                                                <col style={{ width: '7.36%' }} />
-                                                <col style={{ width: '7.36%' }} />
-                                                <col style={{ width: '7.36%' }} />
-                                                <col style={{ width: '7.36%' }} />
-                                                <col style={{ width: '7.36%' }} />
-                                                <col style={{ width: '7.36%' }} />
+                                                <col style={{ width: '9%' }} />
+                                                <col style={{ width: '9%' }} />
+                                                <col style={{ width: '9%' }} />
+                                                <col style={{ width: '9%' }} />
+                                                <col style={{ width: '9%' }} />
+                                                <col style={{ width: '9%' }} />
+                                                <col style={{ width: '9%' }} />
+                                                <col style={{ width: '9%' }} />
                                             </colgroup>
                                             <thead>
                                                 <tr style={{ height: '24px' }}>
@@ -807,7 +803,7 @@ const ErrorReport = ({ filters, setFilters }) => {
                                             <tbody>
                                                 <tr style={{ color: '#800000', height: '24px' }}>
                                                     <td style={{ border: '1px solid black', backgroundColor: 'white' }}>{test.meta.testName}</td>
-                                                    <td style={{ border: '1px solid black', backgroundColor: 'white' }}>{test.meta.date}</td>
+                                                    <td style={{ border: '1px solid black', backgroundColor: 'white' }}>{formatDate(test.meta.date)}</td>
                                                     <td style={{ border: '1px solid black', backgroundColor: '#ffffcc' }}>{test.meta.tot}</td>
                                                     <td style={{ border: '1px solid black', backgroundColor: 'white' }}>{test.meta.air}</td>
                                                     <td style={{ border: '1px solid black', backgroundColor: '#fde9d9' }}>{test.meta.mat}</td>
@@ -860,33 +856,26 @@ const ErrorReport = ({ filters, setFilters }) => {
                                                     </td>
 
                                                     <td colSpan="4" style={{ padding: 0, border: '1px solid black' }}>
-                                                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                                            <tbody>
-                                                                <tr>
-                                                                    <td style={{ width: '50%', borderRight: '1px solid black', verticalAlign: 'top', padding: 0 }}>
-                                                                        <div style={{ padding: '4px', fontSize: '10px', fontWeight: 'bold', color: '#666' }}>Q.{q.Q_No}</div>
-                                                                        <div style={{ textAlign: 'center', paddingBottom: '10px' }}>
-                                                                            {q.Q_URL ? (
-                                                                                <img src={q.Q_URL} style={{ width: '321px', height: 'auto', display: 'block', margin: '0 auto' }} alt="Q" />
-                                                                            ) : (
-                                                                                <div style={{ padding: '20px', fontStyle: 'italic', color: '#ccc', fontSize: '12px' }}>No Image</div>
-                                                                            )}
-                                                                        </div>
-                                                                    </td>
-
-                                                                    <td style={{ width: '50%', verticalAlign: 'top', padding: 0 }}>
-                                                                        <div style={{ padding: '4px', fontSize: '10px', fontWeight: 'bold', color: '#666' }}>Sol</div>
-                                                                        <div style={{ textAlign: 'center', paddingBottom: '10px' }}>
-                                                                            {q.S_URL ? (
-                                                                                <img src={q.S_URL} style={{ maxWidth: '100%', height: 'auto', display: 'block', margin: '0 auto' }} alt="S" />
-                                                                            ) : (
-                                                                                <div style={{ padding: '20px', fontStyle: 'italic', color: '#ccc', fontSize: '12px' }}>No Solution</div>
-                                                                            )}
-                                                                        </div>
-                                                                    </td>
-                                                                </tr>
-                                                            </tbody>
-                                                        </table>
+                                                        <div style={{ borderBottom: '1px solid black' }}>
+                                                            <div style={{ padding: '4px', fontSize: '10px', fontWeight: 'bold', color: '#666' }}>Q.{q.Q_No}</div>
+                                                            <div style={{ textAlign: 'center', paddingBottom: '10px' }}>
+                                                                {q.Q_URL ? (
+                                                                    <img src={q.Q_URL} style={{ width: '642px', maxWidth: '100%', height: 'auto', display: 'block', margin: '0 auto' }} alt="Q" />
+                                                                ) : (
+                                                                    <div style={{ padding: '20px', fontStyle: 'italic', color: '#ccc', fontSize: '12px' }}>No Image</div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <div style={{ padding: '4px', fontSize: '10px', fontWeight: 'bold', color: '#666' }}>Sol</div>
+                                                            <div style={{ textAlign: 'center', paddingBottom: '10px' }}>
+                                                                {q.S_URL ? (
+                                                                    <img src={q.S_URL} style={{ width: '642px', maxWidth: '100%', height: 'auto', display: 'block', margin: '0 auto' }} alt="S" />
+                                                                ) : (
+                                                                    <div style={{ padding: '20px', fontStyle: 'italic', color: '#ccc', fontSize: '12px' }}>No Solution</div>
+                                                                )}
+                                                            </div>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             </tbody>

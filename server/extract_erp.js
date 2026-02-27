@@ -1,6 +1,7 @@
 const XLSX = require('xlsx');
 const fs = require('fs');
 const path = require('path');
+const readline = require('readline-sync');
 const { connectToDb } = require('./db');
 
 // --- Configuration ---
@@ -8,12 +9,24 @@ const ERP_BASE_DIR = 'f:\\Projects\\ENGG Analysis\\ERP Report';
 const CONFIG_FILE = 'f:\\Projects\\ENGG Analysis\\Uploader_Config.xlsx';
 const DEFAULT_S_URL = 'https://i.ibb.co/8g6L82cK/Not-Available.png';
 
+// Global cache for manual subject mappings to avoid repeated prompts for the same test
+const manualMappingCache = {};
+
 const normalizeId = (id) => String(id || '').trim().replace(/[^0-9]/g, '');
 
 const KARNATAKA_PREFIXES = [
     'BEN/', 'BAN/', 'SAR/', 'BLR/', 'HUB/', 'DAV/', 'MYS/', 'TUM/',
     'BEL/', 'BAL/', 'MANG/', 'MNG/', 'MAN/'
 ];
+
+function standardizeSubject(sub) {
+    if (!sub) return '--';
+    const s = String(sub).trim().toUpperCase();
+    if (s.includes('MATH') || s === 'MAT') return 'MATHS';
+    if (s.includes('PHY')) return 'PHYSICS';
+    if (s.includes('CHE')) return 'CHEMISTRY';
+    return s;
+}
 
 function normalizeCampus(branch) {
     let name = String(branch || '').trim().toUpperCase();
@@ -277,7 +290,7 @@ function parseFilenameInfo(filePath, sourceText) {
     // Batch extraction: Pattern -> Sr/Jr.Super-60([FirstLetter]_[Adv/Mains])
     let batchNameRaw = "Batch";
     const baseMatch = text.match(/(?:Sr|Jr)\.[^(_]*/i);
-    const prefix = baseMatch ? baseMatch[0].trim() : (parts[1] || "Batch");
+    let prefix = baseMatch ? baseMatch[0].trim() : (parts[1] || "Batch");
 
     // Find the word in parentheses (like Nucleus or Sterling)
     const parenMatch = text.match(/\(([^)]+)\)/);
@@ -289,7 +302,7 @@ function parseFilenameInfo(filePath, sourceText) {
     const typeLabel = isAdv ? 'Adv' : (isMains ? 'Mains' : '');
 
     // Pattern fix: Jr.Super-60 -> Jr.Super60
-    prefix = prefix.replace(/-60$/, '60').replace(/-120$/, '120');
+    // prefix = prefix.replace(/-60$/, '60').replace(/-120$/, '120');
 
     const batch = `${prefix}(${firstLetter}${typeLabel ? '_' + typeLabel : ''})`;
 
@@ -302,6 +315,8 @@ function parseFilenameInfo(filePath, sourceText) {
 async function processPaper(pool, label, qErrorPath, marksData, topIds, generalIds, allowedCampuses, mode) {
     console.log(`  Processing ${label} QError Extraction (Mode: ${mode})...`);
     const wb = XLSX.readFile(qErrorPath);
+
+    const { testInfo } = marksData;
 
     // Choose the correct sheet: 
     // Case 1: Internal sheets like STUD_ERQ_P1 / STUD_ERQ_P2
@@ -327,11 +342,50 @@ async function processPaper(pool, label, qErrorPath, marksData, topIds, generalI
     console.log(`    [DEBUG] Detected ${qCols.length} Question columns in ${label}.`);
 
     // Identify PICS subfolder for this specific paper (P1/P2)
-    const picsSubDir = findPicsSubFolder(ERP_BASE_DIR, label, marksData.testInfo.batchRaw);
+    const picsSubDir = findPicsSubFolder(ERP_BASE_DIR, label, testInfo.batchRaw);
     console.log(`    [DEBUG] Looking for metadata in: ${picsSubDir}`);
 
-    const metaData = loadZeroReport(picsSubDir);
+    let metaData = loadZeroReport(picsSubDir);
     const keys = loadKeys(path.join(picsSubDir, 'K.xlsx'));
+
+    // --- INTERACTIVE FALLBACK IF ZERO REPORT MISSING OR INCOMPLETE ---
+    const cacheKey = `${testInfo.date}_${testInfo.test}_${label}`;
+    let manualMapping = manualMappingCache[cacheKey] || null;
+
+    const metaCount = Object.keys(metaData.meta).length;
+    // Ask if meta is missing (0) OR clearly incomplete (e.g. < 5 entries when paper is large)
+    const isIncomplete = metaCount > 0 && metaCount < 5 && qCols.length > 10;
+
+    if (!manualMapping && (metaCount === 0 || isIncomplete)) {
+        if (isIncomplete) {
+            console.log(`\n[!] ZERO REPORT for ${testInfo.test} (${label}) seems INCOMPLETE (Only ${metaCount} topics found).`);
+        } else {
+            console.log(`\n[!] ZERO REPORT MISSING for ${testInfo.test} (${label})`);
+        }
+
+        console.log(`[!] Available Questions: 1 to ${qCols.length}`);
+        const setManual = readline.keyInYNStrict("Would you like to manually set Subject Ranges for this test?");
+
+        if (setManual) {
+            manualMapping = {};
+            const subjects = ['MATHS', 'PHYSICS', 'CHEMISTRY'];
+            for (const sub of subjects) {
+                console.log(`\nConfiguring range for: ${sub}`);
+                const start = parseInt(readline.question(`  Start QNo: `));
+                const end = parseInt(readline.question(`  End QNo: `));
+                if (!isNaN(start) && !isNaN(end)) {
+                    for (let q = start; q <= end; q++) manualMapping[q] = sub;
+                }
+            }
+            // Save to cache
+            manualMappingCache[cacheKey] = manualMapping;
+        } else {
+            // Store empty object to not ask again for this test if user said No
+            manualMappingCache[cacheKey] = {};
+        }
+    } else if (manualMapping && Object.keys(manualMapping).length > 0) {
+        console.log(`    [INFO] Using cached subject mapping for ${testInfo.test} (${label})`);
+    }
 
     console.log(`    [DEBUG] Metadata Loaded -> Keys: ${Object.keys(keys).length}, Errors Info: ${Object.keys(metaData).length}`);
 
@@ -347,7 +401,6 @@ async function processPaper(pool, label, qErrorPath, marksData, topIds, generalI
         }
     }
 
-    const { testInfo } = marksData;
     const dbDate = formatDateToSQL(testInfo.date);
 
     const rowsToUpload = [];
@@ -413,11 +466,22 @@ async function processPaper(pool, label, qErrorPath, marksData, topIds, generalI
                 }
                 if (!specificTest) specificTest = testInfo.test;
 
+                const qInt = parseInt(qNo);
+                let fallbackSubject = '--';
+                if (manualMapping && manualMapping[qInt]) {
+                    fallbackSubject = manualMapping[qInt];
+                } else {
+                    const qsPerSub = qCols.length / 3;
+                    if (qInt <= qsPerSub) fallbackSubject = 'MATHS';
+                    else if (qInt <= qsPerSub * 2) fallbackSubject = 'PHYSICS';
+                    else fallbackSubject = 'CHEMISTRY';
+                }
+
                 rowsToUpload.push({
                     STUD_ID: parseInt(studId),
                     Student_Name: studentMarks.Student_Name,
                     Branch: normalizeCampus(studentMarks.Branch), // Normalized campus
-                    Batch: testInfo.batch, // Added Batch
+                    Batch: testInfo.batch, // Re-added Batch
                     Exam_Date: dbDate, // Date
                     Test_Type: specificTest.split('-')[0], // Extract type from local test name
                     Test: specificTest, // Specific test name (e.g. CTA-09 for P2)
@@ -438,7 +502,7 @@ async function processPaper(pool, label, qErrorPath, marksData, topIds, generalI
                     Q_URL: (urlMapping.mapping ? urlMapping.mapping[label]?.Q?.[qNo] : (urlMapping[label]?.Q?.[qNo] || '')) || '',
                     S_URL: (urlMapping.mapping ? urlMapping.mapping[label]?.S?.[qNo] : (urlMapping[label]?.S?.[qNo] || DEFAULT_S_URL)) || DEFAULT_S_URL,
                     Key_Value: keys[qNo] || '',
-                    Subject: meta.Subject || '--',
+                    Subject: standardizeSubject(meta.Subject || fallbackSubject),
                     Topic: meta.Topic || '--',
                     Sub_Topics: meta.Sub_Topics || '--',
                     Question_Type: meta.Question_Type || '--',
