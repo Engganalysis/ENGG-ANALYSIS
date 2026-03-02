@@ -190,7 +190,7 @@ const ErrorReport = ({ filters, setFilters }) => {
 
     // --- PDF GENERATION CORE (Single Student) ---
     const createStudentPDF = async (student, fonts, logoImg) => {
-        const { impactFont, bookmanFont, bookmanBoldFont } = fonts;
+        const { impactFont, bookmanFont, bookmanBoldFont, timesFont } = fonts;
         const doc = new jsPDF('p', 'mm', 'a4');
         const pageWidth = 210;
         const pageHeight = 297;
@@ -209,6 +209,10 @@ const ErrorReport = ({ filters, setFilters }) => {
         if (bookmanBoldFont) {
             doc.addFileToVFS("BOOKOSB.TTF", bookmanBoldFont);
             doc.addFont("BOOKOSB.TTF", "Bookman", "bold");
+        }
+        if (timesFont) {
+            doc.addFileToVFS("times.ttf", timesFont);
+            doc.addFont("times.ttf", "Times", "normal");
         }
 
         // --- Helper: Draw Main Header ---
@@ -519,6 +523,10 @@ const ErrorReport = ({ filters, setFilters }) => {
                 doc.setDrawColor(0);
                 doc.rect(margin, yPos, contentWidth, headerH, 'D'); // Header border
 
+                if (timesFont) doc.setFont("Times", "normal");
+                else if (bookmanBoldFont) doc.setFont("Bookman", "bold");
+                else doc.setFont("helvetica", "bold");
+
                 doc.setTextColor(0); // Black text for light background
 
                 let cx = margin;
@@ -691,14 +699,15 @@ const ErrorReport = ({ filters, setFilters }) => {
         setPdfProgress('Loading Resources...');
 
         try {
-            const [impactFont, bookmanFont, bookmanBoldFont] = await Promise.all([
+            const [impactFont, bookmanFont, bookmanBoldFont, timesFont] = await Promise.all([
                 loadFont('/fonts/unicode.impact.ttf'),
                 loadFont('/fonts/bookman-old-style.ttf'),
-                loadFont('/fonts/BOOKOSB.TTF')
+                loadFont('/fonts/BOOKOSB.TTF'),
+                loadFont('/fonts/times.ttf')
             ]);
             const logoImg = await loadImage('/logo.png');
 
-            const fonts = { impactFont, bookmanFont, bookmanBoldFont };
+            const fonts = { impactFont, bookmanFont, bookmanBoldFont, timesFont };
 
             if (reportData.length === 1) {
                 const doc = await createStudentPDF(reportData[0], fonts, logoImg);
@@ -933,7 +942,7 @@ const ErrorReport = ({ filters, setFilters }) => {
                                                 <col style={{ width: '22mm' }} />
                                             </colgroup>
                                             <thead>
-                                                <tr style={{ backgroundColor: '#E5FFFF', color: 'black', fontSize: '11px', fontWeight: 'bold' }}>
+                                                <tr style={{ backgroundColor: '#E5FFFF', color: 'black', fontSize: '11px', fontWeight: 'bold', fontFamily: '"Times New Roman", Times, serif' }}>
                                                     <td style={{ border: '1px solid black', borderRight: '1px solid #ccc', textAlign: 'center', height: '28px' }}>{q.W_U}</td>
                                                     <td style={{ border: '1px solid black', borderRight: '1px solid #ccc', textAlign: 'center' }}>{q.Q_No}</td>
 
@@ -958,7 +967,7 @@ const ErrorReport = ({ filters, setFilters }) => {
                                                         </div>
                                                     </td>
                                                 </tr>
-                                                <tr style={{ backgroundColor: '#E5FFFF', color: 'black', fontSize: '11px', fontWeight: 'bold' }}>
+                                                <tr style={{ backgroundColor: '#E5FFFF', color: 'black', fontSize: '11px', fontWeight: 'bold', fontFamily: '"Times New Roman", Times, serif' }}>
                                                     <td colSpan="3" style={{ border: '1px solid black', borderRight: '1px solid #ccc', borderTop: '1px solid #ccc', padding: '4px' }}>
                                                         <span style={{ color: '#000080' }}>Type: </span>
                                                         <span style={{ color: 'black', marginLeft: '5px' }}>{q.Question_Type || '--'}</span>
