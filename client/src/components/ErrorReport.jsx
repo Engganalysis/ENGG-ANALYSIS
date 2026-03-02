@@ -437,7 +437,7 @@ const ErrorReport = ({ filters, setFilters }) => {
 
                 if (timesFont) {
                     doc.setFont("Times", "bold");
-                    doc.setFontSize(12);
+                    doc.setFontSize(11);
                 } else {
                     if (bookmanBoldFont) doc.setFont("Bookman", "bold");
                     else doc.setFont("helvetica", "bold");
@@ -445,6 +445,10 @@ const ErrorReport = ({ filters, setFilters }) => {
                 }
 
                 // --- Calculate Heights with Smart Wrap ---
+                const subLabel_pdf = "Sub: ";
+                const subVal_pdf = q.Subject || '--';
+                const subLabelW_pdf = doc.getTextWidth(subLabel_pdf);
+                const subjectLines = getSmartWrappedLines(doc, subVal_pdf, wSubj - 2, subLabelW_pdf);
                 const topicLabel = "Topic: ";
                 const topicVal = q.Topic || '';
                 const topicLabelW = doc.getTextWidth(topicLabel);
@@ -462,20 +466,20 @@ const ErrorReport = ({ filters, setFilters }) => {
                 const detailsLines = getSmartWrappedLines(doc, keyVal, wDetails - 2, keyLabelW);
                 const detailsH = Math.max(2, detailsLines.length) * 4;
 
-                // Proportional Row 2 Header Widths
-                const wType = contentWidth * 0.45;  // 45% for Type (long)
-                const wSrc = contentWidth * 0.15;   // 15%
-                const wOR = contentWidth * 0.20;    // 20%
-                const wLvl = contentWidth * 0.20;   // 20%
+                // Proportional Row 2 Header Widths - Adjusted for better fit
+                const wType = contentWidth * 0.30;   // 30% (Previously 45%)
+                const wSrc = contentWidth * 0.40;    // 40% (Previously 15%) - More space for long source text
+                const wOR = contentWidth * 0.15;     // 15% (Previously 20%)
+                const wLvl = contentWidth * 0.15;    // 15% (Previously 20%)
 
                 const typeLines = getSmartWrappedLines(doc, q.Question_Type || '--', wType - 2, doc.getTextWidth("Type: "));
                 const sourceLines = getSmartWrappedLines(doc, q.Sources || '--', wSrc - 2, doc.getTextWidth("Src: "));
                 const orLines = getSmartWrappedLines(doc, q.Original_Replica || '--', wOR - 2, doc.getTextWidth("O/R: "));
                 const levelLines = getSmartWrappedLines(doc, q.Level || '--', wLvl - 2, doc.getTextWidth("Lvl: "));
 
-                const maxHeaderLines1 = Math.max(2, topicLines.length, subLines.length, detailsLines.length);
+                const maxHeaderLines1 = Math.max(2, subjectLines.length, topicLines.length, subLines.length, detailsLines.length);
                 const maxHeaderLines2 = Math.max(2, typeLines.length, sourceLines.length, orLines.length, levelLines.length);
-                const lineHeight = timesFont ? 5 : 4; // Increased line height for 12pt font
+                const lineHeight = timesFont ? 4.5 : 4; // Adjusted for 11pt font
                 const headerH1 = Math.max(10, (maxHeaderLines1 * lineHeight) + 3);
                 const headerH2 = Math.max(10, (maxHeaderLines2 * lineHeight) + 3);
                 const headerH = headerH1 + headerH2;
@@ -548,7 +552,10 @@ const ErrorReport = ({ filters, setFilters }) => {
                 doc.setTextColor(0, 0, 128); // Navy for labels
                 doc.text("Sub:", cx + 1, ty);
                 doc.setTextColor(0); // Black for values
-                doc.text(String(q.Subject || '--'), cx + 1 + doc.getTextWidth("Sub:"), ty);
+                subjectLines.forEach((line, idx) => {
+                    const ly = ty + (idx * lineHeight);
+                    doc.text(line.text, cx + 1 + line.xOffset, ly);
+                });
                 doc.setDrawColor(0);
                 doc.line(cx + wSubj, yPos, cx + wSubj, yPos + headerH1);
                 cx += wSubj;
@@ -943,11 +950,11 @@ const ErrorReport = ({ filters, setFilters }) => {
                                                 <col style={{ width: '22mm' }} />
                                             </colgroup>
                                             <thead>
-                                                <tr style={{ backgroundColor: '#E5FFFF', color: 'black', fontSize: '12px', fontWeight: 'bold', fontFamily: '"Times New Roman", Times, serif' }}>
+                                                <tr style={{ backgroundColor: '#E5FFFF', color: 'black', fontSize: '11px', fontWeight: 'bold', fontFamily: '"Times New Roman", Times, serif' }}>
                                                     <td style={{ border: '1px solid black', borderRight: '1px solid #ccc', textAlign: 'center', height: '28px' }}>{q.W_U}</td>
                                                     <td style={{ border: '1px solid black', borderRight: '1px solid #ccc', textAlign: 'center' }}>{q.Q_No}</td>
 
-                                                    <td style={{ border: '1px solid black', borderRight: '1px solid #ccc', padding: '4px', verticalAlign: 'top' }}>
+                                                    <td style={{ border: '1px solid black', borderRight: '1px solid #ccc', padding: '4px', verticalAlign: 'top', wordWrap: 'break-word' }}>
                                                         <span style={{ color: '#000080' }}>Sub: </span>
                                                         <span style={{ color: 'black', marginLeft: '5px' }}>{q.Subject}</span>
                                                     </td>
@@ -968,20 +975,20 @@ const ErrorReport = ({ filters, setFilters }) => {
                                                         </div>
                                                     </td>
                                                 </tr>
-                                                <tr style={{ backgroundColor: '#E5FFFF', color: 'black', fontSize: '12px', fontWeight: 'bold', fontFamily: '"Times New Roman", Times, serif' }}>
-                                                    <td colSpan="3" style={{ border: '1px solid black', borderRight: '1px solid #ccc', borderTop: '1px solid #ccc', padding: '4px' }}>
+                                                <tr style={{ backgroundColor: '#E5FFFF', color: 'black', fontSize: '11px', fontWeight: 'bold', fontFamily: '"Times New Roman", Times, serif' }}>
+                                                    <td colSpan="3" style={{ border: '1px solid black', borderRight: '1px solid #ccc', borderTop: '1px solid #ccc', padding: '4px', wordWrap: 'break-word' }}>
                                                         <span style={{ color: '#000080' }}>Type: </span>
                                                         <span style={{ color: 'black', marginLeft: '5px' }}>{q.Question_Type || '--'}</span>
                                                     </td>
-                                                    <td style={{ border: '1px solid black', borderRight: '1px solid #ccc', padding: '4px', borderTop: '1px solid #ccc' }}>
+                                                    <td style={{ border: '1px solid black', borderRight: '1px solid #ccc', padding: '4px', borderTop: '1px solid #ccc', wordWrap: 'break-word' }}>
                                                         <span style={{ color: '#000080' }}>Sources: </span>
                                                         <span style={{ color: 'black', marginLeft: '5px' }}>{q.Sources || '--'}</span>
                                                     </td>
-                                                    <td style={{ border: '1px solid black', borderRight: '1px solid #ccc', padding: '4px', borderTop: '1px solid #ccc' }}>
+                                                    <td style={{ border: '1px solid black', borderRight: '1px solid #ccc', padding: '4px', borderTop: '1px solid #ccc', wordWrap: 'break-word' }}>
                                                         <span style={{ color: '#000080' }}>O/R: </span>
                                                         <span style={{ color: 'black', marginLeft: '5px' }}>{q.Original_Replica || '--'}</span>
                                                     </td>
-                                                    <td style={{ border: '1px solid black', padding: '4px', borderTop: '1px solid #ccc' }}>
+                                                    <td style={{ border: '1px solid black', padding: '4px', borderTop: '1px solid #ccc', wordWrap: 'break-word' }}>
                                                         <span style={{ color: '#000080' }}>Level: </span>
                                                         <span style={{ color: 'black', marginLeft: '5px' }}>{q.Level || '--'}</span>
                                                     </td>
