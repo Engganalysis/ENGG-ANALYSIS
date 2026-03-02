@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const XLSX = require('xlsx');
+const pdfParse = require('pdf-parse');
 const { connectToDb } = require('./db');
 
 // --- Configuration ---
@@ -361,15 +362,62 @@ async function processPaper(pool, label, qErrorPath, marksData, topIds, generalI
     let manualMapping = manualMappingCache[cacheKey] || null;
 
     const metaCount = Object.keys(metaData.meta).length;
-    // Ask if meta is missing (0) OR clearly incomplete (e.g. < 5 entries when paper is large)
     const isIncomplete = metaCount > 0 && metaCount < 5 && qCols.length > 10;
 
-    if (metaCount === 0 || isIncomplete) {
-        if (isIncomplete) {
-            console.log(`    [INFO] ZERO REPORT for ${testInfo.test} (${label}) seems INCOMPLETE. Using partial results + fallback.`);
+    if (!manualMapping && (metaCount === 0 || isIncomplete)) {
+        const totalQs = qCols.length;
+        const perSub = Math.floor(totalQs / 3);
+
+        const ranges = [
+            { start: 1, end: perSub },
+            { start: perSub + 1, end: perSub * 2 },
+            { start: (perSub * 2) + 1, end: totalQs }
+        ];
+
+        console.log(`\n    [!] NO ZERO REPORT FOUND for ${testInfo.test} (${label})`);
+
+        let detectedOrder = null;
+        const pdfOrder = await detectOrderFromPdf(picsSubDir);
+        if (pdfOrder) {
+            console.log(`    [+] Detected subject order from PDF in folder: ${pdfOrder.join(' -> ')}`);
+            detectedOrder = pdfOrder;
         } else {
-            console.warn(`    [WARN] ZERO REPORT MISSING for ${testInfo.test} (${label}). Using 1/3 split fallback.`);
+            console.log(`    [?] Could not automatically detect order from PDF. Defaulting to PCM.`);
+            detectedOrder = ['PHYSICS', 'CHEMISTRY', 'MATHS'];
         }
+
+        console.log(`\n    Proposed Fallback Ranges (1/3 split):`);
+        console.log(`    - ${detectedOrder[0]}: Q1  to Q${ranges[0].end}`);
+        console.log(`    - ${detectedOrder[1]}: Q${ranges[1].start} to Q${ranges[1].end}`);
+        console.log(`    - ${detectedOrder[2]}: Q${ranges[2].start} to Q${totalQs}`);
+
+        const readline = require('readline-sync');
+        let correct = 'Y';
+        try {
+            correct = readline.question(`\n    Is this correct? (Y/N) [Default Y]: `, { defaultInput: 'Y' }).toUpperCase();
+        } catch (e) { }
+
+        manualMapping = {};
+        if (correct === 'N') {
+            const sub1 = readline.question(`    Name of FIRST Subject (1-?): `).toUpperCase();
+            const end1 = parseInt(readline.question(`    End Q No for ${sub1}: `));
+            const sub2 = readline.question(`    Name of SECOND Subject (${end1 + 1}-?): `).toUpperCase();
+            const end2 = parseInt(readline.question(`    End Q No for ${sub2}: `));
+            const sub3 = readline.question(`    Name of THIRD Subject (${end2 + 1}-${totalQs}): `).toUpperCase();
+
+            for (let qn = 1; qn <= totalQs; qn++) {
+                if (qn <= end1) manualMapping[qn] = sub1;
+                else if (qn <= end2) manualMapping[qn] = sub2;
+                else manualMapping[qn] = sub3;
+            }
+        } else {
+            for (let qn = 1; qn <= totalQs; qn++) {
+                if (qn <= ranges[0].end) manualMapping[qn] = detectedOrder[0];
+                else if (qn <= ranges[1].end) manualMapping[qn] = detectedOrder[1];
+                else manualMapping[qn] = detectedOrder[2];
+            }
+        }
+        manualMappingCache[cacheKey] = manualMapping;
     }
 
     console.log(`    [DEBUG] Metadata Loaded -> Keys: ${Object.keys(keys).length}, Errors Info: ${Object.keys(metaData).length}`);
@@ -537,8 +585,10 @@ function findPicsSubFolder(base, label, batchRaw) {
 function loadZeroReport(picsSubDir) {
     if (!picsSubDir || !fs.existsSync(picsSubDir)) return { meta: {}, testName: null };
     const files = fs.readdirSync(picsSubDir);
-    // Find any file that contains 'ZERO REPORT' (case-insensitive) anywhere in its name
-    const zFile = files.find(f => f.toUpperCase().includes('ZERO REPORT') && f.endsWith('.xlsx'));
+    const zFile = files.find(f => {
+        const up = f.toUpperCase();
+        return up.includes('ZERO') && up.includes('REPORT') && f.endsWith('.xlsx');
+    });
     if (!zFile) {
         console.warn(`    [WARN] Zero Report not found in ${picsSubDir}`);
         return { meta: {}, testName: null };
@@ -701,6 +751,48 @@ function formatDateToSQL(dateStr) {
     let month = parts[1];
     if (months[month]) month = months[month];
     return `${year}-${month}-${parts[0].padStart(2, '0')}`;
+}
+
+async function detectOrderFromPdf(picsSubDir) {
+    if (!picsSubDir || !fs.existsSync(picsSubDir)) return null;
+    const files = fs.readdirSync(picsSubDir);
+    // User requested: Just find any PDF file in that folder
+    const pdfFile = files.find(f => f.toLowerCase().endsWith('.pdf'));
+    if (!pdfFile) return null;
+
+    try {
+        const dataBuffer = fs.readFileSync(path.join(picsSubDir, pdfFile));
+        // pdf-parse 1.x is a direct function
+        const data = await pdfParse(dataBuffer);
+        const text = (data.text || "").toUpperCase();
+
+        const subjects = [
+            { id: 'PHYSICS', patterns: ['PHYSICS'] },
+            { id: 'CHEMISTRY', patterns: ['CHEMISTRY'] },
+            { id: 'MATHS', patterns: ['MATHEMATICS', 'MATHS'] }
+        ];
+
+        const found = subjects
+            .map(s => {
+                let earliestIndex = -1;
+                for (const p of s.patterns) {
+                    const idx = text.indexOf(p);
+                    if (idx !== -1 && (earliestIndex === -1 || idx < earliestIndex)) {
+                        earliestIndex = idx;
+                    }
+                }
+                return { id: s.id, index: earliestIndex };
+            })
+            .filter(s => s.index !== -1)
+            .sort((a, b) => a.index - b.index);
+
+        if (found.length === 3) {
+            return found.map(f => f.id);
+        }
+    } catch (e) {
+        console.warn(`    [DEBUG] PDF Order Detection skipped: ${e.message}`);
+    }
+    return null;
 }
 
 processErp();

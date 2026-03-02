@@ -514,19 +514,19 @@ const ErrorReport = ({ filters, setFilters }) => {
                 }
                 yPos = currentY;
 
-                doc.setFillColor(128, 0, 0);
+                doc.setFillColor(229, 255, 255); // #E5FFFF
                 doc.rect(margin, yPos, contentWidth, headerH, 'F');
                 doc.setDrawColor(0);
                 doc.rect(margin, yPos, contentWidth, headerH, 'D'); // Header border
 
-                doc.setTextColor(255);
+                doc.setTextColor(0); // Black text for light background
 
                 let cx = margin;
                 const ty = yPos + 4.5;
 
                 // W/U
                 doc.text(String(q.W_U || ''), cx + (wStat / 2), ty, { align: 'center' });
-                doc.setDrawColor(255);
+                doc.setDrawColor(0); // Black lines
                 doc.line(cx + wStat, yPos, cx + wStat, yPos + headerH1);
                 cx += wStat;
 
@@ -536,42 +536,42 @@ const ErrorReport = ({ filters, setFilters }) => {
                 cx += wQ;
 
                 // Subject Renderer
-                doc.setTextColor(255, 255, 0); // Yellow
+                doc.setTextColor(0, 0, 128); // Navy for labels
                 doc.text("Sub:", cx + 1, ty);
-                doc.setTextColor(255, 255, 255); // White
+                doc.setTextColor(0); // Black for values
                 doc.text(String(q.Subject || '--'), cx + 1 + doc.getTextWidth("Sub:"), ty);
-                doc.setDrawColor(255);
+                doc.setDrawColor(0);
                 doc.line(cx + wSubj, yPos, cx + wSubj, yPos + headerH1);
                 cx += wSubj;
 
                 // Topic Renderer
-                doc.setTextColor(255, 255, 0); // Yellow
+                doc.setTextColor(0, 0, 128); // Navy
                 doc.text(topicLabel, cx + 1, ty);
-                doc.setTextColor(255, 255, 255); // White
+                doc.setTextColor(0); // Black
                 topicLines.forEach((line, idx) => {
                     const ly = ty + (idx * lineHeight);
                     doc.text(line.text, cx + 1 + line.xOffset, ly);
                 });
-                doc.setDrawColor(255);
+                doc.setDrawColor(0);
                 doc.line(cx + wTopic, yPos, cx + wTopic, yPos + headerH1);
                 cx += wTopic;
 
                 // Sub Topic Renderer
-                doc.setTextColor(255, 255, 0); // Yellow
+                doc.setTextColor(0, 0, 128); // Navy
                 doc.text(subLabel, cx + 1, ty);
-                doc.setTextColor(255, 255, 255); // White
+                doc.setTextColor(0); // Black
                 subLines.forEach((line, idx) => {
                     const ly = ty + (idx * lineHeight);
                     doc.text(line.text, cx + 1 + line.xOffset, ly);
                 });
-                doc.setDrawColor(255);
+                doc.setDrawColor(0);
                 doc.line(cx + wSub, yPos, cx + wSub, yPos + headerH1);
                 cx += wSub;
 
                 // Details Column (Key)
-                doc.setTextColor(255, 255, 0);
+                doc.setTextColor(0, 0, 128);
                 doc.text(keyLabel, cx + 2, ty);
-                doc.setTextColor(255, 255, 255);
+                doc.setTextColor(0);
                 detailsLines.forEach((line, idx) => {
                     const ly = ty + (idx * lineHeight);
                     doc.text(line.text, cx + 2 + line.xOffset, ly);
@@ -579,16 +579,16 @@ const ErrorReport = ({ filters, setFilters }) => {
 
                 // --- NEW HEADER ROW 2 ---
                 const yPos2 = yPos + headerH1;
-                doc.setDrawColor(255);
+                doc.setDrawColor(0);
                 doc.line(margin, yPos2, margin + contentWidth, yPos2);
 
                 let cx2 = margin; // Start from margin
                 const ty2 = yPos2 + 4.5;
 
                 const renderSubCol = (label, lines, x, y) => {
-                    doc.setTextColor(255, 255, 0);
+                    doc.setTextColor(0, 0, 128);
                     doc.text(label, x + 1, y);
-                    doc.setTextColor(255, 255, 255);
+                    doc.setTextColor(0);
                     lines.forEach((line, idx) => {
                         const ly = y + (idx * lineHeight);
                         doc.text(line.text, x + 1 + line.xOffset, ly);
@@ -933,47 +933,47 @@ const ErrorReport = ({ filters, setFilters }) => {
                                                 <col style={{ width: '22mm' }} />
                                             </colgroup>
                                             <thead>
-                                                <tr style={{ backgroundColor: '#800000', color: 'white', fontSize: '11px', fontWeight: 'bold' }}>
-                                                    <td style={{ border: '1px solid black', borderRight: '1px solid white', textAlign: 'center', height: '28px' }}>{q.W_U}</td>
-                                                    <td style={{ border: '1px solid black', borderRight: '1px solid white', textAlign: 'center' }}>{q.Q_No}</td>
+                                                <tr style={{ backgroundColor: '#E5FFFF', color: 'black', fontSize: '11px', fontWeight: 'bold' }}>
+                                                    <td style={{ border: '1px solid black', borderRight: '1px solid #ccc', textAlign: 'center', height: '28px' }}>{q.W_U}</td>
+                                                    <td style={{ border: '1px solid black', borderRight: '1px solid #ccc', textAlign: 'center' }}>{q.Q_No}</td>
 
-                                                    <td style={{ border: '1px solid black', borderRight: '1px solid white', padding: '4px', verticalAlign: 'top' }}>
-                                                        <span style={{ color: '#FFFF00' }}>Sub: </span>
-                                                        <span style={{ color: 'white', marginLeft: '5px' }}>{q.Subject}</span>
+                                                    <td style={{ border: '1px solid black', borderRight: '1px solid #ccc', padding: '4px', verticalAlign: 'top' }}>
+                                                        <span style={{ color: '#000080' }}>Sub: </span>
+                                                        <span style={{ color: 'black', marginLeft: '5px' }}>{q.Subject}</span>
                                                     </td>
 
-                                                    <td style={{ border: '1px solid black', borderRight: '1px solid white', padding: '4px', verticalAlign: 'top', wordWrap: 'break-word' }}>
-                                                        <span style={{ color: '#FFFF00' }}>Topic: </span>
-                                                        <span style={{ color: 'white', marginLeft: '5px' }}>{q.Topic}</span>
+                                                    <td style={{ border: '1px solid black', borderRight: '1px solid #ccc', padding: '4px', verticalAlign: 'top', wordWrap: 'break-word' }}>
+                                                        <span style={{ color: '#000080' }}>Topic: </span>
+                                                        <span style={{ color: 'black', marginLeft: '5px' }}>{q.Topic}</span>
                                                     </td>
-                                                    <td style={{ border: '1px solid black', borderRight: '1px solid white', padding: '4px', verticalAlign: 'top', wordWrap: 'break-word' }}>
-                                                        <span style={{ color: '#FFFF00' }}>Sub Topic: </span>
-                                                        <span style={{ color: 'white', marginLeft: '5px' }}>{q.Sub_Topics}</span>
+                                                    <td style={{ border: '1px solid black', borderRight: '1px solid #ccc', padding: '4px', verticalAlign: 'top', wordWrap: 'break-word' }}>
+                                                        <span style={{ color: '#000080' }}>Sub Topic: </span>
+                                                        <span style={{ color: 'black', marginLeft: '5px' }}>{q.Sub_Topics}</span>
                                                     </td>
 
                                                     <td style={{ border: '1px solid black', textAlign: 'left', padding: '2px 4px', verticalAlign: 'top' }}>
                                                         <div>
-                                                            <span style={{ color: '#FFFF00' }}>Key: </span>
-                                                            <span style={{ color: 'white', marginLeft: '5px' }}>{q.Key_Value}</span>
+                                                            <span style={{ color: '#000080' }}>Key: </span>
+                                                            <span style={{ color: 'black', marginLeft: '5px' }}>{q.Key_Value}</span>
                                                         </div>
                                                     </td>
                                                 </tr>
-                                                <tr style={{ backgroundColor: '#800000', color: 'white', fontSize: '11px', fontWeight: 'bold' }}>
-                                                    <td colSpan="3" style={{ border: '1px solid black', borderRight: '1px solid white', borderTop: '1px solid white', padding: '4px' }}>
-                                                        <span style={{ color: '#FFFF00' }}>Type: </span>
-                                                        <span style={{ color: 'white', marginLeft: '5px' }}>{q.Question_Type || '--'}</span>
+                                                <tr style={{ backgroundColor: '#E5FFFF', color: 'black', fontSize: '11px', fontWeight: 'bold' }}>
+                                                    <td colSpan="3" style={{ border: '1px solid black', borderRight: '1px solid #ccc', borderTop: '1px solid #ccc', padding: '4px' }}>
+                                                        <span style={{ color: '#000080' }}>Type: </span>
+                                                        <span style={{ color: 'black', marginLeft: '5px' }}>{q.Question_Type || '--'}</span>
                                                     </td>
-                                                    <td style={{ border: '1px solid black', borderRight: '1px solid white', padding: '4px', borderTop: '1px solid white' }}>
-                                                        <span style={{ color: '#FFFF00' }}>Sources: </span>
-                                                        <span style={{ color: 'white', marginLeft: '5px' }}>{q.Sources || '--'}</span>
+                                                    <td style={{ border: '1px solid black', borderRight: '1px solid #ccc', padding: '4px', borderTop: '1px solid #ccc' }}>
+                                                        <span style={{ color: '#000080' }}>Sources: </span>
+                                                        <span style={{ color: 'black', marginLeft: '5px' }}>{q.Sources || '--'}</span>
                                                     </td>
-                                                    <td style={{ border: '1px solid black', borderRight: '1px solid white', padding: '4px', borderTop: '1px solid white' }}>
-                                                        <span style={{ color: '#FFFF00' }}>O/R: </span>
-                                                        <span style={{ color: 'white', marginLeft: '5px' }}>{q.Original_Replica || '--'}</span>
+                                                    <td style={{ border: '1px solid black', borderRight: '1px solid #ccc', padding: '4px', borderTop: '1px solid #ccc' }}>
+                                                        <span style={{ color: '#000080' }}>O/R: </span>
+                                                        <span style={{ color: 'black', marginLeft: '5px' }}>{q.Original_Replica || '--'}</span>
                                                     </td>
-                                                    <td style={{ border: '1px solid black', padding: '4px', borderTop: '1px solid white' }}>
-                                                        <span style={{ color: '#FFFF00' }}>Level: </span>
-                                                        <span style={{ color: 'white', marginLeft: '5px' }}>{q.Level || '--'}</span>
+                                                    <td style={{ border: '1px solid black', padding: '4px', borderTop: '1px solid #ccc' }}>
+                                                        <span style={{ color: '#000080' }}>Level: </span>
+                                                        <span style={{ color: 'black', marginLeft: '5px' }}>{q.Level || '--'}</span>
                                                     </td>
                                                 </tr>
                                             </thead>

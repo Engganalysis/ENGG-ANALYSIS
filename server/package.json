@@ -19,7 +19,9 @@
     "express": "^5.2.1",
     "mysql2": "^3.16.2",
     "nodemailer": "^7.0.13",
+    "pdf-parse": "^1.1.1",
     "puppeteer": "^24.37.5",
+    "readline-sync": "^1.4.10",
     "xlsx": "^0.18.5"
   }
 }

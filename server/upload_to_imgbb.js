@@ -111,6 +111,7 @@ async function uploadToImgBB() {
 
         // --- 2. SET INFINITE TIMEOUTS ---
         await page.setDefaultNavigationTimeout(0);
+        await page.setDefaultTimeout(0); // For all waitForSelector calls
         await page.goto('https://imgbb.com/login', { waitUntil: 'networkidle2' });
 
         await page.type('#login-subject', 'siri121');
@@ -206,23 +207,41 @@ async function uploadToImgBB() {
 
                 // 2. Select files for THIS batch only
                 const filePaths = missingFiles.map(f => path.join(dir, f));
-                await page.waitForSelector('input[type="file"]', { timeout: 60000 });
+                await page.waitForSelector('input[type="file"]');
                 const inputUpload = await page.$('input[type="file"]');
                 await inputUpload.uploadFile(...filePaths);
 
                 // 3. Click UPLOAD
                 console.log("  Waiting for UPLOAD button...");
-                await page.waitForSelector('button.btn.btn-big.green[data-action="upload"]', { visible: true, timeout: 60000 });
+                await page.waitForSelector('button.btn.btn-big.green[data-action="upload"]', { visible: true });
                 await new Promise(r => setTimeout(r, 1500));
                 await page.evaluate(() => document.querySelector('button.btn.btn-big.green[data-action="upload"]')?.click());
 
-                // 4. Wait for results
-                console.log("  Uploading batch... Please wait.");
-                await page.waitForSelector('#uploaded-embed-toggle', { timeout: 600000 });
-                await new Promise(r => setTimeout(r, 3000));
-                await page.select('#uploaded-embed-toggle', 'direct-links');
+                // 4. Wait for results (Success Screen)
+                console.log("  Uploading batch... Please wait. (This may take several minutes for large batches)");
+                await page.waitForSelector('#uploaded-embed-toggle');
 
-                await page.waitForSelector('#uploaded-embed-code-1', { visible: true });
+                console.log("  Upload complete. Extracting links...");
+                await new Promise(r => setTimeout(r, 2000));
+
+                // Try to select direct-links multiple times if needed
+                let linksFound = false;
+                for (let attempt = 1; attempt <= 3; attempt++) {
+                    try {
+                        await page.select('#uploaded-embed-toggle', 'direct-links');
+                        await page.waitForSelector('#uploaded-embed-code-1', { visible: true });
+                        linksFound = true;
+                        break;
+                    } catch (e) {
+                        console.log(`  [Retry] Link box not visible yet (Attempt ${attempt}/3)...`);
+                        await new Promise(r => setTimeout(r, 2000));
+                    }
+                }
+
+                if (!linksFound) {
+                    throw new Error("Could not find the link box (#uploaded-embed-code-1) after selection.");
+                }
+
                 const allLinksText = await page.$eval('#uploaded-embed-code-1', el => el.value);
                 const links = allLinksText.split('\n').map(l => l.trim()).filter(l => l);
 
