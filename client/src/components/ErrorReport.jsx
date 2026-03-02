@@ -435,9 +435,14 @@ const ErrorReport = ({ filters, setFilters }) => {
                 const imgAreaW = contentWidth; // Full width
                 const halfImgW = imgAreaW / 2;
 
-                if (bookmanBoldFont) doc.setFont("Bookman", "bold");
-                else doc.setFont("helvetica", "bold");
-                doc.setFontSize(9);
+                if (timesFont) {
+                    doc.setFont("Times", "bold");
+                    doc.setFontSize(12);
+                } else {
+                    if (bookmanBoldFont) doc.setFont("Bookman", "bold");
+                    else doc.setFont("helvetica", "bold");
+                    doc.setFontSize(9);
+                }
 
                 // --- Calculate Heights with Smart Wrap ---
                 const topicLabel = "Topic: ";
@@ -470,9 +475,9 @@ const ErrorReport = ({ filters, setFilters }) => {
 
                 const maxHeaderLines1 = Math.max(2, topicLines.length, subLines.length, detailsLines.length);
                 const maxHeaderLines2 = Math.max(2, typeLines.length, sourceLines.length, orLines.length, levelLines.length);
-                const lineHeight = 4;
-                const headerH1 = Math.max(9, (maxHeaderLines1 * lineHeight) + 3);
-                const headerH2 = Math.max(9, (maxHeaderLines2 * lineHeight) + 3);
+                const lineHeight = timesFont ? 5 : 4; // Increased line height for 12pt font
+                const headerH1 = Math.max(10, (maxHeaderLines1 * lineHeight) + 3);
+                const headerH2 = Math.max(10, (maxHeaderLines2 * lineHeight) + 3);
                 const headerH = headerH1 + headerH2;
 
                 const imgTargetW = contentWidth - 4;
@@ -522,10 +527,6 @@ const ErrorReport = ({ filters, setFilters }) => {
                 doc.rect(margin, yPos, contentWidth, headerH, 'F');
                 doc.setDrawColor(0);
                 doc.rect(margin, yPos, contentWidth, headerH, 'D'); // Header border
-
-                if (timesFont) doc.setFont("Times", "normal");
-                else if (bookmanBoldFont) doc.setFont("Bookman", "bold");
-                else doc.setFont("helvetica", "bold");
 
                 doc.setTextColor(0); // Black text for light background
 
@@ -942,7 +943,7 @@ const ErrorReport = ({ filters, setFilters }) => {
                                                 <col style={{ width: '22mm' }} />
                                             </colgroup>
                                             <thead>
-                                                <tr style={{ backgroundColor: '#E5FFFF', color: 'black', fontSize: '11px', fontWeight: 'bold', fontFamily: '"Times New Roman", Times, serif' }}>
+                                                <tr style={{ backgroundColor: '#E5FFFF', color: 'black', fontSize: '12px', fontWeight: 'bold', fontFamily: '"Times New Roman", Times, serif' }}>
                                                     <td style={{ border: '1px solid black', borderRight: '1px solid #ccc', textAlign: 'center', height: '28px' }}>{q.W_U}</td>
                                                     <td style={{ border: '1px solid black', borderRight: '1px solid #ccc', textAlign: 'center' }}>{q.Q_No}</td>
 
@@ -967,7 +968,7 @@ const ErrorReport = ({ filters, setFilters }) => {
                                                         </div>
                                                     </td>
                                                 </tr>
-                                                <tr style={{ backgroundColor: '#E5FFFF', color: 'black', fontSize: '11px', fontWeight: 'bold', fontFamily: '"Times New Roman", Times, serif' }}>
+                                                <tr style={{ backgroundColor: '#E5FFFF', color: 'black', fontSize: '12px', fontWeight: 'bold', fontFamily: '"Times New Roman", Times, serif' }}>
                                                     <td colSpan="3" style={{ border: '1px solid black', borderRight: '1px solid #ccc', borderTop: '1px solid #ccc', padding: '4px' }}>
                                                         <span style={{ color: '#000080' }}>Type: </span>
                                                         <span style={{ color: 'black', marginLeft: '5px' }}>{q.Question_Type || '--'}</span>
