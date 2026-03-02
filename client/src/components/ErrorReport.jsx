@@ -423,54 +423,66 @@ const ErrorReport = ({ filters, setFilters }) => {
                 const sImg = await loadImage(q.S_URL);
 
                 // Adjusted Widths - Merged Key/Perc, More space for Subs
-                const wStat = 15; // W/U
-                const wQ = 11;    // Q No
-                const wSubj = 30; // Subject
-                const wDetails = 22; // Key
+                const imgTargetW = contentWidth - 4;
+                let qH = 0; if (qImg) qH = (qImg.height / qImg.width) * imgTargetW;
+                let sH = 0; if (sImg) sH = (sImg.height / sImg.width) * imgTargetW;
 
-                const remainingW = contentWidth - wStat - wQ - wSubj - wDetails;
-                const wTopic = remainingW / 2;
-                const wSub = remainingW / 2;
-
-                const imgAreaW = contentWidth; // Full width
-                const halfImgW = imgAreaW / 2;
-
-                if (timesFont) {
+                // --- DYNAMIC WIDTH CALCULATION (AUTO-WIDTH) ---
+                // Helper to get total potential width of a field (Label + Value)
+                const getFieldWidth = (label, value) => {
+                    doc.setFontSize(11); // Ensure measurement is at the correct size
                     doc.setFont("Times", "bold");
-                    doc.setFontSize(11);
-                } else {
-                    if (bookmanBoldFont) doc.setFont("Bookman", "bold");
-                    else doc.setFont("helvetica", "bold");
-                    doc.setFontSize(9);
-                }
+                    return doc.getTextWidth(label) + doc.getTextWidth(String(value || '--')) + 4; // +4 for padding
+                };
 
-                // --- Calculate Heights with Smart Wrap ---
+                // Row 1 Fields
+                const w1_w = 12; // Fixed
+                const w1_q = 11; // Fixed
+                const w1_sub = getFieldWidth("Sub: ", q.Subject);
+                const w1_topic = getFieldWidth("Topic: ", q.Topic);
+                const w1_subtopic = getFieldWidth("Sub Topic: ", q.Sub_Topics);
+                const w1_key = getFieldWidth("Key: ", q.Key_Value);
+
+                const totalRow1Requested = w1_w + w1_q + w1_sub + w1_topic + w1_subtopic + w1_key;
+                const scale1 = contentWidth / totalRow1Requested;
+
+                const wW = w1_w * scale1;
+                const wQ = w1_q * scale1;
+                const wSubj = w1_sub * scale1;
+                const wTopic = w1_topic * scale1;
+                const wSub = w1_subtopic * scale1;
+                const wDetails = w1_key * scale1;
+
+                // Row 2 Fields
+                const w2_type = getFieldWidth("Type: ", q.Question_Type);
+                const w2_src = getFieldWidth("Src: ", q.Sources);
+                const w2_or = getFieldWidth("O/R: ", q.Original_Replica);
+                const w2_lvl = getFieldWidth("Lvl: ", q.Level);
+
+                const totalRow2Requested = w2_type + w2_src + w2_or + w2_lvl;
+                const scale2 = contentWidth / totalRow2Requested;
+
+                const wType = w2_type * scale2;
+                const wSrc = w2_src * scale2;
+                const wOR = w2_or * scale2;
+                const wLvl = w2_lvl * scale2;
+
+                // --- Calculate Heights with Smart Wrap (Using Auto-calculated Widths) ---
                 const subLabel_pdf = "Sub: ";
                 const subVal_pdf = q.Subject || '--';
-                const subLabelW_pdf = doc.getTextWidth(subLabel_pdf);
-                const subjectLines = getSmartWrappedLines(doc, subVal_pdf, wSubj - 2, subLabelW_pdf);
+                const subjectLines = getSmartWrappedLines(doc, subVal_pdf, wSubj - 2, doc.getTextWidth(subLabel_pdf));
+
                 const topicLabel = "Topic: ";
                 const topicVal = q.Topic || '';
-                const topicLabelW = doc.getTextWidth(topicLabel);
-                const topicLines = getSmartWrappedLines(doc, topicVal, wTopic - 2, topicLabelW);
+                const topicLines = getSmartWrappedLines(doc, topicVal, wTopic - 2, doc.getTextWidth(topicLabel));
 
                 const subLabel = "Sub Topic: ";
                 const subVal = q.Sub_Topics || '';
-                const subLabelW = doc.getTextWidth(subLabel);
-                const subLines = getSmartWrappedLines(doc, subVal, wSub - 2, subLabelW);
+                const subLines = getSmartWrappedLines(doc, subVal, wSub - 2, doc.getTextWidth(subLabel));
 
-                // Key Calc
                 const keyLabel = "Key: ";
                 const keyVal = q.Key_Value || '';
-                const keyLabelW = doc.getTextWidth(keyLabel);
-                const detailsLines = getSmartWrappedLines(doc, keyVal, wDetails - 2, keyLabelW);
-                const detailsH = Math.max(2, detailsLines.length) * 4;
-
-                // Proportional Row 2 Header Widths - Adjusted for better fit
-                const wType = contentWidth * 0.30;   // 30% (Previously 45%)
-                const wSrc = contentWidth * 0.40;    // 40% (Previously 15%) - More space for long source text
-                const wOR = contentWidth * 0.15;     // 15% (Previously 20%)
-                const wLvl = contentWidth * 0.15;    // 15% (Previously 20%)
+                const detailsLines = getSmartWrappedLines(doc, keyVal, wDetails - 2, doc.getTextWidth(keyLabel));
 
                 const typeLines = getSmartWrappedLines(doc, q.Question_Type || '--', wType - 2, doc.getTextWidth("Type: "));
                 const sourceLines = getSmartWrappedLines(doc, q.Sources || '--', wSrc - 2, doc.getTextWidth("Src: "));
@@ -479,9 +491,9 @@ const ErrorReport = ({ filters, setFilters }) => {
 
                 const maxHeaderLines1 = Math.max(2, subjectLines.length, topicLines.length, subLines.length, detailsLines.length);
                 const maxHeaderLines2 = Math.max(2, typeLines.length, sourceLines.length, orLines.length, levelLines.length);
-                const lineHeight = timesFont ? 4.5 : 4; // Adjusted for 11pt font
-                const headerH1 = Math.max(10, (maxHeaderLines1 * lineHeight) + 3);
-                const headerH2 = Math.max(10, (maxHeaderLines2 * lineHeight) + 3);
+                const lineHeight = timesFont ? 4.5 : 4;
+                const headerH1 = Math.max(10, (maxHeaderLines1 * lineHeight) + 2);
+                const headerH2 = Math.max(10, (maxHeaderLines2 * lineHeight) + 2);
                 const headerH = headerH1 + headerH2;
 
                 const imgTargetW = contentWidth - 4;
@@ -538,10 +550,10 @@ const ErrorReport = ({ filters, setFilters }) => {
                 const ty = yPos + 4.5;
 
                 // W/U
-                doc.text(String(q.W_U || ''), cx + (wStat / 2), ty, { align: 'center' });
+                doc.text(String(q.W_U || ''), cx + (wW / 2), ty, { align: 'center' });
                 doc.setDrawColor(0); // Black lines
-                doc.line(cx + wStat, yPos, cx + wStat, yPos + headerH1);
-                cx += wStat;
+                doc.line(cx + wW, yPos, cx + wW, yPos + headerH1);
+                cx += wW;
 
                 // Q No
                 doc.text(String(q.Q_No), cx + (wQ / 2), ty, { align: 'center' });
@@ -940,14 +952,14 @@ const ErrorReport = ({ filters, setFilters }) => {
 
                                     {/* Questions */}
                                     {renderQs.map((q, qIdx) => (
-                                        <table key={qIdx} style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid black', marginBottom: '10px', backgroundColor: 'white' }}>
+                                        <table key={qIdx} style={{ width: '100%', tableLayout: 'auto', borderCollapse: 'collapse', border: '1px solid black', marginBottom: '10px', backgroundColor: 'white' }}>
                                             <colgroup>
-                                                <col style={{ width: '15mm' }} />
-                                                <col style={{ width: '11mm' }} />
-                                                <col style={{ width: '30mm' }} />
-                                                <col style={{ width: '57mm' }} />
-                                                <col style={{ width: '57mm' }} />
-                                                <col style={{ width: '22mm' }} />
+                                                <col style={{ width: 'auto' }} />
+                                                <col style={{ width: 'auto' }} />
+                                                <col style={{ width: 'auto' }} />
+                                                <col style={{ width: 'auto' }} />
+                                                <col style={{ width: 'auto' }} />
+                                                <col style={{ width: 'auto' }} />
                                             </colgroup>
                                             <thead>
                                                 <tr style={{ backgroundColor: '#E5FFFF', color: 'black', fontSize: '11px', fontWeight: 'bold', fontFamily: '"Times New Roman", Times, serif' }}>
