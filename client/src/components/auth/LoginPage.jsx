@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { auth, db } from '../../firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
 import { useNavigate, Link } from 'react-router-dom';
-import { LogIn, Mail, Lock, ArrowRight, ShieldCheck, Award, TrendingUp, Users, School } from 'lucide-react';
+import { LogIn, Mail, Lock, ArrowRight, ShieldCheck, Award, TrendingUp, Users, School, Clock, LogOut } from 'lucide-react';
+import { useAuth } from './AuthProvider';
+import { auth, db } from '../../firebase';
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 import { AnimatePresence } from 'framer-motion';
 import Toast from '../Toast';
 
@@ -15,6 +16,7 @@ const LoginPage = () => {
     const [currentSlide, setCurrentSlide] = useState(0);
     const [toast, setToast] = useState(null);
     const navigate = useNavigate();
+    const { currentUser, userData, loading: authLoading } = useAuth();
 
     const showToast = (message, type = 'error') => {
         setToast({ message, type });
@@ -130,7 +132,46 @@ const LoginPage = () => {
                     {/* Right Side: Form */}
                     <div className="auth-form-side">
                         <div className="auth-form-inner">
-                            <div className="auth-header">
+                            {currentUser && !authLoading && (!userData || !userData.isApproved) && userData?.role !== 'admin' ? (
+                                <div className="pending-notice">
+                                    <div className="pending-icon">
+                                        {userData ? <Clock size={48} color="#f59e0b" /> : <ShieldCheck size={48} color="#ef4444" />}
+                                    </div>
+                                    <h3>{userData ? "Account Pending Approval" : "Profile Not Found"}</h3>
+                                    <p>
+                                        {userData 
+                                            ? `Your registration request for ${userData.campus} has been received and is currently being reviewed by the administrator.`
+                                            : "We couldn't find your profile in our records. Please ensure you have completed the registration process."
+                                        }
+                                    </p>
+                                    <p className="sub-text">
+                                        {userData 
+                                            ? "You will be able to access the dashboard once your account is approved."
+                                            : "If you haven't registered yet, please use the link below."
+                                        }
+                                    </p>
+                                    
+                                    <div className="status-badge">
+                                        Status: <span>{userData ? "Awaiting Approval" : "Unregistered"}</span>
+                                    </div>
+
+                                    {!userData && (
+                                        <Link to="/register" className="btn-primary" style={{ marginTop: '20px', width: '100%', textDecoration: 'none' }}>
+                                            Go to Registration
+                                        </Link>
+                                    )}
+
+                                    <button 
+                                        onClick={() => signOut(auth)} 
+                                        className="btn-secondary-link"
+                                        style={{ marginTop: '20px', display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center', width: '100%' }}
+                                    >
+                                        <LogOut size={16} /> {userData ? "Sign out and try another account" : "Back to Login"}
+                                    </button>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="auth-header">
                                 <div className="auth-logo">
                                     <img src="/logo.png" alt="Sri Chaitanya" />
                                 </div>
@@ -182,9 +223,11 @@ const LoginPage = () => {
                                 </Link>
                             </div>
 
-                            <div className="admin-hint">
-                                <ShieldCheck size={14} /> Admin Access Available
-                            </div>
+                                    <div className="admin-hint">
+                                        <ShieldCheck size={14} /> Admin Access Available
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>

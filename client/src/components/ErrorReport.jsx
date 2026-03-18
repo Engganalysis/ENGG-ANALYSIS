@@ -496,10 +496,6 @@ const ErrorReport = ({ filters, setFilters }) => {
                 const headerH2 = Math.max(10, (maxHeaderLines2 * lineHeight) + 2);
                 const headerH = headerH1 + headerH2;
 
-                const imgTargetW = contentWidth - 4;
-                let qH = 0; if (qImg) qH = (qImg.height / qImg.width) * imgTargetW;
-                let sH = 0; if (sImg) sH = (sImg.height / sImg.width) * imgTargetW;
-
                 const FOOTER_SPACE = 15;
                 const SAFE_PAGE_H = pageHeight - FOOTER_SPACE;
 
