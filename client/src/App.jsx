@@ -23,8 +23,8 @@ import { logActivity } from './utils/activityLogger';
 const ProtectedRoute = ({ children, requireAdmin = false }) => {
     const { currentUser, userData, loading, isAdmin } = useAuth();
 
-    // Combined loading state for Auth or User Data
-    const isLoading = loading || (currentUser && !userData);
+    // Core loading state from AuthProvider
+    const isLoading = loading;
 
     // Show the Timer if loading
     // Note: We render children hidden or null while loading? 

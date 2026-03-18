@@ -9,9 +9,8 @@ const PORT = process.env.PORT || 5000;
 const fs = require('fs');
 
 const logQuery = (query, params) => {
-    const logPath = path.join(__dirname, 'query_debug.log');
-    const logEntry = `[${new Date().toISOString()}]\nQUERY: ${query}\nPARAMS: ${JSON.stringify(params)}\n---\n`;
-    fs.appendFileSync(logPath, logEntry);
+    // console.log(`[${new Date().toISOString()}] QUERY: ${query} PARAMS: ${JSON.stringify(params)}`);
+    // Removed synchronous fs.appendFileSync for performance
 };
 
 app.use(cors());
@@ -43,15 +42,33 @@ const cache = {
 
 // Request logging middleware
 app.use((req, res, next) => {
-    const logLine = `[${new Date().toISOString()}] ${req.method} ${req.url}\n`;
-    fs.appendFileSync(path.join(__dirname, 'access.log'), logLine);
     console.log(`[${new Date().toISOString()}] Incoming ${req.method} request to ${req.url}`);
     next();
 });
 
-// Health Check Endpoint (For UptimeRobot/Render)
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'OK', timestamp: new Date().toISOString() });
+// Combined Health Check Endpoint (Lightweight for UptimeRobot, robust for debugging)
+app.get('/api/health', async (req, res) => {
+    try {
+        // Quick check if we can reach the DB, but don't block the response for too long
+        const pool = await connectToDb();
+        await pool.request().query('SELECT 1');
+        res.json({ 
+            status: 'OK', 
+            database: 'Connected',
+            timestamp: new Date().toISOString() 
+        });
+    } catch (err) {
+        console.error("Health Check Error:", err.message);
+        // Still return 200/OK if the server is up but DB is down, 
+        // OR return 500 if you want UptimeRobot to report failure when DB is down.
+        // Usually better to return 500 so you know it's broken.
+        res.status(500).json({ 
+            status: 'ERROR', 
+            database: 'Disconnected',
+            error: err.message,
+            timestamp: new Date().toISOString() 
+        });
+    }
 });
 
 
@@ -198,21 +215,7 @@ app.get('/api/debug-count', async (req, res) => {
     }
 });
 
-// Health Check
-app.get('/api/health', async (req, res) => {
-    try {
-        const pool = await connectToDb();
-        await pool.request().query('SELECT 1');
-        res.json({
-            status: 'ok',
-            message: 'Database connected',
-            version: '1.0.2 - Filter Mapping Fixed',
-            timestamp: '2026-02-11 17:35'
-        });
-    } catch (err) {
-        res.status(500).json({ status: 'error', message: err.message });
-    }
-});
+// Old Redundant Health Check Removed
 
 // Test Route
 app.get('/', (req, res) => {
