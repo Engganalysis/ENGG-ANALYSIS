@@ -36,7 +36,32 @@ const ProtectedRoute = ({ children, requireAdmin = false }) => {
     // But if we want the timer component to handle the "cutting", 
     // it's cleaner to use it as a conditional return.
 
-    if (isLoading) return <div className="loading-state">Loading...</div>;
+    if (isLoading) return (
+        <div className="loading-state" style={{ flexDirection: 'column', gap: '20px', textAlign: 'center' }}>
+            <div className="spinner"></div>
+            <div style={{ fontWeight: 'bold', fontSize: '1.4rem', color: '#1e293b' }}>INITIALIZING SECURITY SESSION...</div>
+            <div style={{ fontSize: '1rem', color: '#64748b', maxWidth: '300px' }}>
+                We are verifying your credentials and connecting to the secure database.
+            </div>
+            
+            <button 
+                onClick={() => {
+                    // Force complete the loading state for the specific admin email if they click bypass
+                    if (currentUser?.email === "yenjarappa.s@varsitymgmt.com") {
+                        window.location.reload(); // Reload will re-trigger the now-faster bypass logic
+                    } else {
+                        // For others, just try to force it if it's stuck
+                        alert("Bypassing connection... If you are not an authorized admin, you may see Restricted Access.");
+                        window.location.href = '/'; 
+                    }
+                }}
+                className="btn-secondary-link"
+                style={{ marginTop: '20px', color: '#6366f1', textDecoration: 'underline' }}
+            >
+                Taking too long? Click here to bypass connection wait.
+            </button>
+        </div>
+    );
 
     // No user -> straight to login
     if (!currentUser) return <Navigate to="/login" replace />;

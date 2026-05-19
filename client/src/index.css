@@ -577,10 +577,33 @@ body {
 
 .loading-state {
     display: flex;
-    height: 200px;
+    flex-direction: column;
+    height: 100vh;
+    width: 100vw;
     align-items: center;
     justify-content: center;
     color: var(--text-secondary);
+    background: white;
+}
+
+.spinner {
+    width: 48px;
+    height: 48px;
+    border: 5px solid #e2e8f0;
+    border-bottom-color: #6366f1;
+    border-radius: 50%;
+    display: inline-block;
+    box-sizing: border-box;
+    animation: rotation 1s linear infinite;
+}
+
+@keyframes rotation {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 /* Custom Scrollbar */

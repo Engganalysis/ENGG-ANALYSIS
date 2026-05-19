@@ -16,25 +16,38 @@ export const AuthProvider = ({ children }) => {
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             setLoading(true);
             setCurrentUser(user);
-            if (user) {
-                // Fetch extra user data from Firestore (campus, role, isApproved)
-                const userDoc = await getDoc(doc(db, "users", user.uid));
-                if (userDoc.exists()) {
-                    setUserData(userDoc.data());
-                } else {
-                    // This could be the master admin if not in Firestore, or some error
-                    // For the provided admin email, we can mock it as admin
+            try {
+                if (user) {
+                    // CRITICAL: Bypass Firestore check for master admin immediately
+                    // This prevents hangs for the main admin if Firestore is slow
                     if (user.email === "yenjarappa.s@varsitymgmt.com") {
                         setUserData({ role: 'admin', campus: 'All', isApproved: true, email: user.email });
-                    } else {
+                        setLoading(false);
+                        return;
+                    }
 
+                    // For other users, fetch with a timeout
+                    const fetchPromise = getDoc(doc(db, "users", user.uid));
+                    const timeoutPromise = new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error("Fetch Timeout")), 10000)
+                    );
+
+                    const userDoc = await Promise.race([fetchPromise, timeoutPromise]);
+                    
+                    if (userDoc.exists()) {
+                        setUserData(userDoc.data());
+                    } else {
                         setUserData(null);
                     }
+                } else {
+                    setUserData(null);
                 }
-            } else {
+            } catch (err) {
+                console.error("Auth provider fetch error:", err);
                 setUserData(null);
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         });
 
         return unsubscribe;
