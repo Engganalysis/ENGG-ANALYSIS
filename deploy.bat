@@ -27,7 +27,7 @@ cd ..
 echo.
 echo === [4/4] Triggering Render Backend Deployment ===
 :: Updated with your NEW direct service hook
-curl -X POST "https://api.render.com/deploy/srv-d6673b7gi27c73dlr9j0?key=XKk6HDUo_v4"
+curl -X POST "https://api.render.com/deploy/srv-d864jhf7f7vs739lc9e0?key=OpFXfg-HYD4"
 
 echo.
 echo.
