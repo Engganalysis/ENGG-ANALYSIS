@@ -356,24 +356,24 @@ const AnalysisReport = ({ filters }) => {
 
             const drawRichTextRow = (label, value, y) => {
                 doc.setFont("helvetica", "bold");
-                doc.setFontSize(10);
+                doc.setFontSize(11.5);
                 doc.setTextColor(0, 0, 0); // Black label
                 doc.text(label, 10, y);
                 
                 const labelWidth = doc.getTextWidth(label);
                 
                 doc.setFont("helvetica", "bold");
-                doc.setFontSize(11); // Slightly larger
+                doc.setFontSize(13.5); // Align with Microsoft Sans Serif 13 scale from template
                 doc.setTextColor(0, 176, 240); // Light blue (#00B0F0) value
                 doc.text(value, 10 + labelWidth, y);
             };
 
             drawRichTextRow("Prog Name:  ", progName, currentY);
-            currentY += 5;
+            currentY += 6;
             drawRichTextRow("Test Date:   ", testDate, currentY);
-            currentY += 5;
+            currentY += 6;
             drawRichTextRow("Test Name:  ", testName, currentY);
-            currentY += 8;
+            currentY += 6;
 
             // 6. Inspect columns in the template sheet to determine visibility and headers
             const getCellValueAsString = (cell) => {
