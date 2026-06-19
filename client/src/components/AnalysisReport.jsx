@@ -653,9 +653,24 @@ const AnalysisReport = ({ filters }) => {
             const progName = studentMarks[0]?.batch || stream;
 
             // Update Metadata Rows 5, 6, 7
-            worksheet.getCell('A5').value = `Prog Name:  ${progName}`;
-            worksheet.getCell('A6').value = `Test Date:   ${testDate}`;
-            worksheet.getCell('A7').value = `Test Name:  ${testName}`;
+            worksheet.getCell('A5').value = {
+                richText: [
+                    { text: "Prog Name:  " },
+                    { font: { bold: true, size: 13, color: { argb: "FF00B0F0" }, name: "Microsoft Sans Serif", family: 2 }, text: progName }
+                ]
+            };
+            worksheet.getCell('A6').value = {
+                richText: [
+                    { text: "Test Date:   " },
+                    { font: { bold: true, size: 13, color: { argb: "FF00B0F0" }, name: "Microsoft Sans Serif", family: 2 }, text: testDate }
+                ]
+            };
+            worksheet.getCell('A7').value = {
+                richText: [
+                    { text: "Test Name:  " },
+                    { font: { bold: true, size: 13, color: { argb: "FF00B0F0" }, name: "Microsoft Sans Serif", family: 2 }, text: testName }
+                ]
+            };
 
             // Save row styles from row 10 and 11
             const row10Styles = [];
@@ -752,38 +767,38 @@ const AnalysisReport = ({ filters }) => {
                     case 'TEST_MODE': return student.test_mode || '';
                     case 'CAMPUS': return (student.campus || '').toUpperCase();
                     case 'TOT': return Math.round(student.tot || 0);
-                    case 'TOT_PER': return student.tot_per !== undefined && student.tot_per !== null ? Number(student.tot_per).toFixed(1) : (student.max_tot ? Number((student.tot / student.max_tot) * 100).toFixed(1) : '0.0');
+                    case 'TOT_PER': return student.tot_per !== undefined && student.tot_per !== null ? Number(Number(student.tot_per).toFixed(1)) : (student.max_tot ? Number(Number((student.tot / student.max_tot) * 100).toFixed(1)) : 0.0);
                     case 'AIR_RANK': return Math.round(student.air) || '-';
                     case 'STATE_RANK': return student.state_rank || '';
                     case 'CAMP_RANK': return student.camp_rank || '';
                     case 'SEC_RANK': return student.sec_rank || '';
                     case 'MAT': return Math.round(student.mat || 0);
                     case 'MAT_RANK': return Math.round(student.m_rank || 0);
-                    case 'MAT_PER': return student.mat_per !== undefined && student.mat_per !== null ? Number(student.mat_per).toFixed(1) : (student.max_mat ? Number((student.mat / student.max_mat) * 100).toFixed(1) : '0.0');
+                    case 'MAT_PER': return student.mat_per !== undefined && student.mat_per !== null ? Number(Number(student.mat_per).toFixed(1)) : (student.max_mat ? Number(Number((student.mat / student.max_mat) * 100).toFixed(1)) : 0.0);
                     case 'PHY': return Math.round(student.phy || 0);
                     case 'PHY_RANK': return Math.round(student.p_rank || 0);
-                    case 'PHY_PER': return student.phy_per !== undefined && student.phy_per !== null ? Number(student.phy_per).toFixed(1) : (student.max_phy ? Number((student.phy / student.max_phy) * 100).toFixed(1) : '0.0');
+                    case 'PHY_PER': return student.phy_per !== undefined && student.phy_per !== null ? Number(Number(student.phy_per).toFixed(1)) : (student.max_phy ? Number(Number((student.phy / student.max_phy) * 100).toFixed(1)) : 0.0);
                     case 'CHE': return Math.round(student.che || 0);
                     case 'CHE_RANK': return Math.round(student.c_rank || 0);
-                    case 'CHE_PER': return student.che_per !== undefined && student.che_per !== null ? Number(student.che_per).toFixed(1) : (student.max_che ? Number((student.che / student.max_che) * 100).toFixed(1) : '0.0');
+                    case 'CHE_PER': return student.che_per !== undefined && student.che_per !== null ? Number(Number(student.che_per).toFixed(1)) : (student.max_che ? Number(Number((student.che / student.max_che) * 100).toFixed(1)) : 0.0);
                     default: return '';
                 }
             };
 
             const getTotalsFieldValue = (totalsVal, field) => {
                 switch (field) {
-                    case 'TOT': return Number(totalsVal.tot || 0).toFixed(1);
-                    case 'TOT_PER': return totalsVal.tot_per !== undefined && totalsVal.tot_per !== null ? Number(totalsVal.tot_per).toFixed(1) : '';
+                    case 'TOT': return Number(Number(totalsVal.tot || 0).toFixed(1));
+                    case 'TOT_PER': return totalsVal.tot_per !== undefined && totalsVal.tot_per !== null ? Number(Number(totalsVal.tot_per).toFixed(1)) : '';
                     case 'AIR_RANK': return Math.round(totalsVal.air) || '-';
-                    case 'MAT': return Number(totalsVal.mat || 0).toFixed(1);
-                    case 'MAT_RANK': return Number(totalsVal.m_rank || 0).toFixed(1);
-                    case 'MAT_PER': return totalsVal.mat_per !== undefined && totalsVal.mat_per !== null ? Number(totalsVal.mat_per).toFixed(1) : '';
-                    case 'PHY': return Number(totalsVal.phy || 0).toFixed(1);
-                    case 'PHY_RANK': return Number(totalsVal.p_rank || 0).toFixed(1);
-                    case 'PHY_PER': return totalsVal.phy_per !== undefined && totalsVal.phy_per !== null ? Number(totalsVal.phy_per).toFixed(1) : '';
-                    case 'CHE': return Number(totalsVal.che || 0).toFixed(1);
-                    case 'CHE_RANK': return Number(totalsVal.c_rank || 0).toFixed(1);
-                    case 'CHE_PER': return totalsVal.che_per !== undefined && totalsVal.che_per !== null ? Number(totalsVal.che_per).toFixed(1) : '';
+                    case 'MAT': return Number(Number(totalsVal.mat || 0).toFixed(1));
+                    case 'MAT_RANK': return Number(Number(totalsVal.m_rank || 0).toFixed(1));
+                    case 'MAT_PER': return totalsVal.mat_per !== undefined && totalsVal.mat_per !== null ? Number(Number(totalsVal.mat_per).toFixed(1)) : '';
+                    case 'PHY': return Number(Number(totalsVal.phy || 0).toFixed(1));
+                    case 'PHY_RANK': return Number(Number(totalsVal.p_rank || 0).toFixed(1));
+                    case 'PHY_PER': return totalsVal.phy_per !== undefined && totalsVal.phy_per !== null ? Number(Number(totalsVal.phy_per).toFixed(1)) : '';
+                    case 'CHE': return Number(Number(totalsVal.che || 0).toFixed(1));
+                    case 'CHE_RANK': return Number(Number(totalsVal.c_rank || 0).toFixed(1));
+                    case 'CHE_PER': return totalsVal.che_per !== undefined && totalsVal.che_per !== null ? Number(Number(totalsVal.che_per).toFixed(1)) : '';
                     default: return '';
                 }
             };
