@@ -502,40 +502,14 @@ const AnalysisReport = ({ filters }) => {
                 }
             };
 
-            const getTotalsFieldValue = (totalsVal, field) => {
-                switch (field) {
-                    case 'TOT': return Number(totalsVal.tot || 0).toFixed(1);
-                    case 'TOT_PER': return totalsVal.tot_per !== undefined && totalsVal.tot_per !== null ? Number(totalsVal.tot_per).toFixed(1) : '';
-                    case 'AIR_RANK': return Math.round(totalsVal.air) || '-';
-                    case 'MAT': return Number(totalsVal.mat || 0).toFixed(1);
-                    case 'MAT_RANK': return Number(totalsVal.m_rank || 0).toFixed(1);
-                    case 'MAT_PER': return totalsVal.mat_per !== undefined && totalsVal.mat_per !== null ? Number(totalsVal.mat_per).toFixed(1) : '';
-                    case 'PHY': return Number(totalsVal.phy || 0).toFixed(1);
-                    case 'PHY_RANK': return Number(totalsVal.p_rank || 0).toFixed(1);
-                    case 'PHY_PER': return totalsVal.phy_per !== undefined && totalsVal.phy_per !== null ? Number(totalsVal.phy_per).toFixed(1) : '';
-                    case 'CHE': return Number(totalsVal.che || 0).toFixed(1);
-                    case 'CHE_RANK': return Number(totalsVal.c_rank || 0).toFixed(1);
-                    case 'CHE_PER': return totalsVal.che_per !== undefined && totalsVal.che_per !== null ? Number(totalsVal.che_per).toFixed(1) : '';
-                    default: return '';
-                }
-            };
+
 
             // Map Student Body Data Rows
             const body = studentMarks.map(row => {
                 return visibleColumns.map(col => getStudentFieldValue(row, col.field));
             });
 
-            if (totals) {
-                const totalRowData = visibleColumns.map((col, colIdx) => {
-                    if (colIdx === 0) return 'Campus Selection Average';
-                    
-                    const fColIdx = visibleColumns.findIndex(c => c.field === 'TOT');
-                    if (colIdx < fColIdx) return ''; // Empty cells for merge
-                    
-                    return getTotalsFieldValue(totals, col.field);
-                });
-                body.push(totalRowData);
-            }
+
 
             // Dynamically assign cell widths to fit landscape page nicely
             const usableWidth = 281; // 297mm - 16mm margins (8mm each side)
@@ -603,34 +577,22 @@ const AnalysisReport = ({ filters }) => {
                             }
                         }
                     } else if (data.section === 'body') {
-                        const isTotalRow = (totals && data.row.index === body.length - 1);
-                        if (isTotalRow) {
+                        const colField = visibleColumns[data.column.index].field;
+                        // Marks columns: blue text & light purple/gray fill from template
+                        if (['TOT', 'MAT', 'PHY', 'CHE'].includes(colField)) {
+                            data.cell.styles.textColor = [0, 51, 204]; // #0033CC
+                            data.cell.styles.fillColor = [238, 230, 236]; // #EEE6EC
                             data.cell.styles.fontStyle = 'bold';
-                            data.cell.styles.fillColor = [235, 241, 245];
-                            if (data.column.index === 0) {
-                                const fColIdx = visibleColumns.findIndex(c => c.field === 'TOT');
-                                if (fColIdx > 1) {
-                                    data.cell.colSpan = fColIdx;
-                                }
-                            }
-                        } else {
-                            const colField = visibleColumns[data.column.index].field;
-                            // Marks columns: blue text & light purple/gray fill from template
-                            if (['TOT', 'MAT', 'PHY', 'CHE'].includes(colField)) {
-                                data.cell.styles.textColor = [0, 51, 204]; // #0033CC
-                                data.cell.styles.fillColor = [238, 230, 236]; // #EEE6EC
-                                data.cell.styles.fontStyle = 'bold';
-                            }
-                            // Rank columns: red text
-                            else if (['AIR_RANK', 'MAT_RANK', 'PHY_RANK', 'CHE_RANK'].includes(colField)) {
-                                data.cell.styles.textColor = [204, 51, 0]; // #CC3300
-                                data.cell.styles.fontStyle = 'bold';
-                            }
-                            // Percentage columns: bold text
-                            else if (['TOT_PER', 'MAT_PER', 'PHY_PER', 'CHE_PER'].includes(colField)) {
-                                data.cell.styles.fontStyle = 'bold';
-                                data.cell.styles.textColor = [0, 0, 0]; // Black
-                            }
+                        }
+                        // Rank columns: red text
+                        else if (['AIR_RANK', 'MAT_RANK', 'PHY_RANK', 'CHE_RANK'].includes(colField)) {
+                            data.cell.styles.textColor = [204, 51, 0]; // #CC3300
+                            data.cell.styles.fontStyle = 'bold';
+                        }
+                        // Percentage columns: bold text
+                        else if (['TOT_PER', 'MAT_PER', 'PHY_PER', 'CHE_PER'].includes(colField)) {
+                            data.cell.styles.fontStyle = 'bold';
+                            data.cell.styles.textColor = [0, 0, 0]; // Black
                         }
                     }
                 }
@@ -803,23 +765,7 @@ const AnalysisReport = ({ filters }) => {
                 }
             };
 
-            const getTotalsFieldValue = (totalsVal, field) => {
-                switch (field) {
-                    case 'TOT': return Number(Number(totalsVal.tot || 0).toFixed(1));
-                    case 'TOT_PER': return totalsVal.tot_per !== undefined && totalsVal.tot_per !== null ? Number(Number(totalsVal.tot_per).toFixed(1)) : '';
-                    case 'AIR_RANK': return Math.round(totalsVal.air) || '-';
-                    case 'MAT': return Number(Number(totalsVal.mat || 0).toFixed(1));
-                    case 'MAT_RANK': return Number(Number(totalsVal.m_rank || 0).toFixed(1));
-                    case 'MAT_PER': return totalsVal.mat_per !== undefined && totalsVal.mat_per !== null ? Number(Number(totalsVal.mat_per).toFixed(1)) : '';
-                    case 'PHY': return Number(Number(totalsVal.phy || 0).toFixed(1));
-                    case 'PHY_RANK': return Number(Number(totalsVal.p_rank || 0).toFixed(1));
-                    case 'PHY_PER': return totalsVal.phy_per !== undefined && totalsVal.phy_per !== null ? Number(Number(totalsVal.phy_per).toFixed(1)) : '';
-                    case 'CHE': return Number(Number(totalsVal.che || 0).toFixed(1));
-                    case 'CHE_RANK': return Number(Number(totalsVal.c_rank || 0).toFixed(1));
-                    case 'CHE_PER': return totalsVal.che_per !== undefined && totalsVal.che_per !== null ? Number(Number(totalsVal.che_per).toFixed(1)) : '';
-                    default: return '';
-                }
-            };
+
 
             // Populate Student Data Rows
             studentMarks.forEach((student, index) => {
@@ -845,52 +791,11 @@ const AnalysisReport = ({ filters }) => {
                 });
             });
 
-            // Populate Totals Row at the bottom
-            if (totals) {
-                const totalRowNum = 10 + studentMarks.length;
-                const totalRow = worksheet.getRow(totalRowNum);
-                
-                const totalRowValues = [];
-                const fColIdx = visibleColumns.findIndex(c => c.field === 'TOT');
-                const fColNum = visibleColumns[fColIdx].colNumber;
-                
-                visibleColumns.forEach((col, idx) => {
-                    if (idx === 0) {
-                        totalRowValues[col.colNumber] = 'Campus Selection Average';
-                    } else if (col.colNumber < fColNum) {
-                        totalRowValues[col.colNumber] = '';
-                    } else {
-                        totalRowValues[col.colNumber] = getTotalsFieldValue(totals, col.field);
-                    }
-                });
-                totalRow.values = totalRowValues;
-                
-                // Merge cells from first column to column just before TOT
-                const firstColLetter = visibleColumns[0].colLetter;
-                const preTotColLetter = String.fromCharCode(64 + fColNum - 1);
-                worksheet.mergeCells(`${firstColLetter}${totalRowNum}:${preTotColLetter}${totalRowNum}`);
-                
-                // Style Totals Row
-                totalRow.height = row10Height;
-                visibleColumns.forEach(col => {
-                    const style = row10Styles[col.colNumber];
-                    if (style) {
-                        const cell = totalRow.getCell(col.colNumber);
-                        cell.style = style;
-                        cell.font = { ...style.font, bold: true };
-                        // Add light tint background color for totals row
-                        cell.fill = {
-                            type: 'pattern',
-                            pattern: 'solid',
-                            fgColor: { argb: 'FFEBF1F5' } // Very light slate gray
-                        };
-                    }
-                });
-            }
+
 
             // Clear remaining template rows (values and styles) instead of splicing
             const originalRowCount = worksheet.rowCount;
-            const totalRowNum = 10 + studentMarks.length + (totals ? 1 : 0);
+            const totalRowNum = 10 + studentMarks.length;
             if (originalRowCount > totalRowNum) {
                 for (let r = totalRowNum + 1; r <= originalRowCount; r++) {
                     const row = worksheet.getRow(r);
