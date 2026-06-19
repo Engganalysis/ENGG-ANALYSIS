@@ -244,9 +244,25 @@ const AnalysisReport = ({ filters }) => {
                 }
             };
 
-            const [logoImg, impactFont] = await Promise.all([
+            // Load Excel Template to read column visibility and headers
+            const fetchTemplate = async () => {
+                try {
+                    const response = await fetch('/Result Template.xlsx');
+                    const arrayBuffer = await response.arrayBuffer();
+                    const wb = new ExcelJS.Workbook();
+                    await wb.xlsx.load(arrayBuffer);
+                    const ws = wb.getWorksheet('Main(Micro)') || wb.worksheets[0];
+                    return ws;
+                } catch (err) {
+                    console.error("[PDF] Template loading error:", err);
+                    return null;
+                }
+            };
+
+            const [logoImg, impactFont, worksheet] = await Promise.all([
                 loadImage('/logo.png'),
-                loadFont('/fonts/unicode.impact.ttf')
+                loadFont('/fonts/unicode.impact.ttf'),
+                fetchTemplate()
             ]);
 
             // Add Font
@@ -266,40 +282,58 @@ const AnalysisReport = ({ filters }) => {
                 logoW = logoH * aspect;
             }
             
+            // Replicate the exact title rich text colors and fonts
+            doc.setFont("Impact", "normal");
+            doc.setFontSize(26);
+            const textPart1 = "Sri Chaitanya ";
+            const part1W = doc.getTextWidth(textPart1);
+
             doc.setFont("helvetica", "bold");
-            doc.setFontSize(22);
-            const titleText = "Sri Chaitanya IIT Academy.,India.";
-            const titleW = doc.getTextWidth(titleText);
+            doc.setFontSize(20);
+            const textPart2 = "IIT Academy.,India.";
+            const part2W = doc.getTextWidth(textPart2);
+
+            const totalTextW = part1W + part2W;
             const gap = logoImg ? 4 : 0;
-            const row1Width = logoW + gap + titleW;
+            const row1Width = logoW + gap + totalTextW;
             const row1StartX = (pageWidth - row1Width) / 2;
 
             if (logoImg) {
                 doc.addImage(logoImg, 'PNG', row1StartX, currentY, logoW, logoH, undefined, 'FAST');
             }
-            doc.setTextColor(0, 112, 192); // #0070C0
-            doc.text(titleText, row1StartX + logoW + gap, currentY + 9);
+            
+            // Draw Part 1 (Red/brown)
+            doc.setFont("Impact", "normal");
+            doc.setFontSize(26);
+            doc.setTextColor(220, 38, 38); // Deep red
+            doc.text(textPart1, row1StartX + logoW + gap, currentY + 9);
+
+            // Draw Part 2 (Deep blue)
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(20);
+            doc.setTextColor(0, 112, 192); // Blue
+            doc.text(textPart2, row1StartX + logoW + gap + part1W, currentY + 8.5);
             currentY += 14;
 
-            // 2. Draw Row 2: Location list
+            // 2. Draw Row 2: Location list with Wingdings bullets
             doc.setFont("helvetica", "bold");
             doc.setFontSize(7.5);
-            doc.setTextColor(227, 0, 127); // Magenta/Pinkish
-            const locText = "A.P  T.S  KARNATAKA  TAMILNADU  MAHARASTRA  DELHI  RANCHI";
+            doc.setTextColor(219, 39, 119); // Magenta
+            const locText = "• A.P   • T.S   • KARNATAKA   • TAMILNADU   • MAHARASTRA   • DELHI   • RANCHI";
             doc.text(locText, pageWidth / 2, currentY, { align: 'center' });
             currentY += 5;
 
             // 3. Draw Row 3: ICON Central Office
             doc.setFont("helvetica", "bold");
-            doc.setFontSize(10);
+            doc.setFontSize(9.5);
             doc.setTextColor(0, 0, 0); // Black
             const iconText = "ICON Central Office - Madhapur - Hyderabad";
             doc.text(iconText, pageWidth / 2, currentY, { align: 'center' });
             currentY += 6;
 
-            // 4. Draw Row 4: ALL INDIA MARKS ANALYSIS (or customHeading)
+            // 4. Draw Row 4: Banner ALL INDIA MARKS ANALYSIS (or customHeading)
             const row4Height = 8;
-            doc.setFillColor(0, 112, 192); // Blue background
+            doc.setFillColor(0, 112, 192); // Blue background for banner
             doc.rect(10, currentY, pageWidth - 20, row4Height, 'F');
             
             doc.setFont("helvetica", "bold");
@@ -313,8 +347,11 @@ const AnalysisReport = ({ filters }) => {
             const testDate = examStats.length > 0 ? formatDate(examStats[0].DATE) : formatDate(new Date());
             const stream = (filters.stream && filters.stream.length > 0) ? filters.stream.join(',') : 'SR_ELITE';
             const testName = examStats.length > 0 ? examStats[0].Test : 'GRAND TEST';
-            const fullPattern = `${testDate}_${stream}_${testName}_All India Marks Analysis`.replace(/\//g, '-');
             const progName = studentMarks[0]?.batch || stream;
+
+            const headingName = currentHeading || "All India Marks Analysis";
+            const cleanHeading = headingName.replace(/[^a-zA-Z0-9\- _]/g, '').trim();
+            const fullPattern = `${testDate}_${stream}_${testName}_${cleanHeading}`;
 
             doc.setFont("helvetica", "bold");
             doc.setFontSize(10);
@@ -327,58 +364,133 @@ const AnalysisReport = ({ filters }) => {
             doc.text(`Test Name:  ${testName}`, 10, currentY);
             currentY += 8;
 
-            // 6. Data Tables - Replicating the 20 columns layout
-            const tableColumn = [
-                "STUD_ID", "NAME OF THE STUDENT", "SEC", "TEST_MODE", "CAMPUS NAME", 
-                "TOT", "%", "AIR RANK", "State RANK", "Camp RANK", "Sec RANK", 
-                "MAT", "MAT RANK", "%", "PHY", "PHY RANK", "%", "CHE", "CHE RANK", "%"
-            ];
+            // 6. Inspect columns in the template sheet to determine visibility and headers
+            const visibleColumns = [];
+            const getCellValueAsString = (cell) => {
+                if (!cell || cell.value === null || cell.value === undefined) return '';
+                if (typeof cell.value === 'object' && cell.value.richText) {
+                    return cell.value.richText.map(rt => rt.text || '').join('');
+                }
+                return String(cell.value);
+            };
 
-            const subHeader = [
-                "", "", "", "", "", "300", "", "", "", "", "", "100", "", "", "100", "", "", "100", "", ""
-            ];
+            if (worksheet) {
+                for (let i = 1; i <= 20; i++) {
+                    const column = worksheet.getColumn(i);
+                    if (!column.hidden) {
+                        visibleColumns.push({
+                            index: i,
+                            colLetter: String.fromCharCode(64 + i),
+                            width: column.width || 10
+                        });
+                    }
+                }
+            } else {
+                // Fallback if template worksheet fails to load: visible columns are all except hidden ones (C, I, J, K)
+                const fallbackColumns = [
+                    { index: 1, colLetter: 'A', width: 15 },
+                    { index: 2, colLetter: 'B', width: 35 },
+                    { index: 5, colLetter: 'E', width: 30 },
+                    { index: 6, colLetter: 'F', width: 10 },
+                    { index: 7, colLetter: 'G', width: 10 },
+                    { index: 8, colLetter: 'H', width: 10 },
+                    { index: 12, colLetter: 'L', width: 10 },
+                    { index: 13, colLetter: 'M', width: 10 },
+                    { index: 14, colLetter: 'N', width: 10 },
+                    { index: 15, colLetter: 'O', width: 10 },
+                    { index: 16, colLetter: 'P', width: 10 },
+                    { index: 17, colLetter: 'Q', width: 10 },
+                    { index: 18, colLetter: 'R', width: 10 },
+                    { index: 19, colLetter: 'S', width: 10 },
+                    { index: 20, colLetter: 'T', width: 10 }
+                ];
+                visibleColumns.push(...fallbackColumns);
+            }
 
-            const body = studentMarks.map(row => [
-                row.STUD_ID || '',
-                (row.name || '').toUpperCase(),
-                row.sec || '',
-                row.test_mode || '',
-                (row.campus || '').toUpperCase(),
-                Math.round(row.tot || 0),
-                row.max_tot ? ((row.tot / row.max_tot) * 100).toFixed(1) : '0.0',
-                Math.round(row.air) || '-',
-                row.state_rank || '',
-                row.camp_rank || '',
-                row.sec_rank || '',
-                Math.round(row.mat || 0),
-                Math.round(row.m_rank || 0),
-                row.max_mat ? ((row.mat / row.max_mat) * 100).toFixed(1) : '0.0',
-                Math.round(row.phy || 0),
-                Math.round(row.p_rank || 0),
-                row.max_phy ? ((row.phy / row.max_phy) * 100).toFixed(1) : '0.0',
-                Math.round(row.che || 0),
-                Math.round(row.c_rank || 0),
-                row.max_che ? ((row.che / row.max_che) * 100).toFixed(1) : '0.0'
-            ]);
+            // Build dynamic headers (Row 8 & Row 9)
+            const tableColumn = [];
+            const subHeader = [];
+            
+            visibleColumns.forEach(col => {
+                if (worksheet) {
+                    const cell8 = worksheet.getCell(`${col.colLetter}8`);
+                    const cell9 = worksheet.getCell(`${col.colLetter}9`);
+                    tableColumn.push(getCellValueAsString(cell8));
+                    subHeader.push(getCellValueAsString(cell9));
+                } else {
+                    // Fallback headers
+                    const defaultHeaders8 = {
+                        A: "STUD_ID", B: "NAME OF THE STUDENT", E: "CAMPUS NAME",
+                        F: "TOT", G: "%", H: "AIR RANK", L: "MAT", M: "MAT RANK",
+                        N: "%", O: "PHY", P: "PHY RANK", Q: "%", R: "CHE", S: "CHE RANK", T: "%"
+                    };
+                    const defaultHeaders9 = {
+                        F: "300", L: "100", O: "100", R: "100"
+                    };
+                    tableColumn.push(defaultHeaders8[col.colLetter] || '');
+                    subHeader.push(defaultHeaders9[col.colLetter] || '');
+                }
+            });
+
+            // Map Student Body Data Rows
+            const body = studentMarks.map(row => {
+                return visibleColumns.map(col => {
+                    switch (col.colLetter) {
+                        case 'A': return row.STUD_ID || '';
+                        case 'B': return (row.name || '').toUpperCase();
+                        case 'C': return row.sec || '';
+                        case 'D': return row.test_mode || '';
+                        case 'E': return (row.campus || '').toUpperCase();
+                        case 'F': return Math.round(row.tot || 0);
+                        case 'G': return row.max_tot ? ((row.tot / row.max_tot) * 100).toFixed(1) : '0.0';
+                        case 'H': return Math.round(row.air) || '-';
+                        case 'I': return row.state_rank || '';
+                        case 'J': return row.camp_rank || '';
+                        case 'K': return row.sec_rank || '';
+                        case 'L': return Math.round(row.mat || 0);
+                        case 'M': return Math.round(row.m_rank || 0);
+                        case 'N': return row.max_mat ? ((row.mat / row.max_mat) * 100).toFixed(1) : '0.0';
+                        case 'O': return Math.round(row.phy || 0);
+                        case 'P': return Math.round(row.p_rank || 0);
+                        case 'Q': return row.max_phy ? ((row.phy / row.max_phy) * 100).toFixed(1) : '0.0';
+                        case 'R': return Math.round(row.che || 0);
+                        case 'S': return Math.round(row.c_rank || 0);
+                        case 'T': return row.max_che ? ((row.che / row.max_che) * 100).toFixed(1) : '0.0';
+                        default: return '';
+                    }
+                });
+            });
 
             if (totals) {
-                body.push([
-                    'Campus Selection Average', '', '', '', '',
-                    Number(totals.tot || 0).toFixed(1),
-                    '',
-                    Math.round(totals.air) || '-',
-                    '', '', '',
-                    Number(totals.mat || 0).toFixed(1),
-                    Number(totals.m_rank || 0).toFixed(1),
-                    '',
-                    Number(totals.phy || 0).toFixed(1),
-                    Number(totals.p_rank || 0).toFixed(1),
-                    '',
-                    Number(totals.che || 0).toFixed(1),
-                    Number(totals.c_rank || 0).toFixed(1),
-                    ''
-                ]);
+                const totalRowData = visibleColumns.map((col, colIdx) => {
+                    if (colIdx === 0) return 'Campus Selection Average';
+                    
+                    const fColIdx = visibleColumns.findIndex(c => c.colLetter === 'F');
+                    if (colIdx < fColIdx) return ''; // Empty cells for merge
+                    
+                    switch (col.colLetter) {
+                        case 'F': return Number(totals.tot || 0).toFixed(1);
+                        case 'H': return Math.round(totals.air) || '-';
+                        case 'L': return Number(totals.mat || 0).toFixed(1);
+                        case 'M': return Number(totals.m_rank || 0).toFixed(1);
+                        case 'O': return Number(totals.phy || 0).toFixed(1);
+                        case 'P': return Number(totals.p_rank || 0).toFixed(1);
+                        case 'R': return Number(totals.che || 0).toFixed(1);
+                        case 'S': return Number(totals.c_rank || 0).toFixed(1);
+                        default: return '';
+                    }
+                });
+                body.push(totalRowData);
             }
+
+            // Dynamically assign cell widths to fit landscape page nicely
+            const columnStyles = {};
+            visibleColumns.forEach((col, idx) => {
+                if (col.colLetter === 'A') columnStyles[idx] = { cellWidth: 15 };
+                else if (col.colLetter === 'B') columnStyles[idx] = { halign: 'left', cellWidth: 35 };
+                else if (col.colLetter === 'E') columnStyles[idx] = { halign: 'left', cellWidth: 32 };
+                else columnStyles[idx] = { cellWidth: 10 };
+            });
 
             autoTable(doc, {
                 head: [tableColumn, subHeader],
@@ -386,55 +498,54 @@ const AnalysisReport = ({ filters }) => {
                 startY: currentY,
                 theme: 'grid',
                 styles: {
-                    fontSize: 7, // Small font size to fit all 20 columns
+                    fontSize: 7,
                     cellPadding: 0.5,
                     halign: 'center',
                     valign: 'middle',
-                    lineColor: [173, 216, 230], // Standard LightBlue #ADD8E6
+                    lineColor: [179, 232, 235], // Template border: #B3E8EB
                     lineWidth: 0.1,
                     textColor: [0, 0, 0],
                     font: "helvetica",
                     fontStyle: 'normal'
                 },
                 headStyles: {
-                    fillColor: [0, 112, 192], // Blue headers matching theme
-                    textColor: [255, 255, 255], // White text
+                    fillColor: [0, 166, 162], // #00A6A2 teal/cyan header from template
+                    textColor: [255, 255, 255],
                     fontStyle: 'bold',
-                    lineWidth: 0.15,
-                    fontSize: 7.5,
+                    lineWidth: 0.1,
+                    lineColor: [179, 232, 235],
+                    fontSize: 7,
                     cellPadding: 0.6
                 },
-                columnStyles: {
-                    0: { cellWidth: 15 }, // STUD_ID
-                    1: { halign: 'left', cellWidth: 32 }, // NAME
-                    2: { cellWidth: 8 },  // SEC
-                    3: { cellWidth: 15 }, // TEST_MODE
-                    4: { halign: 'left', cellWidth: 26 }, // CAMPUS NAME
-                    5: { cellWidth: 10, fillColor: [242, 230, 242], fontStyle: 'bold' }, // TOT (Lavender)
-                    6: { cellWidth: 9 },  // TOT %
-                    7: { cellWidth: 10 }, // AIR RANK
-                    8: { cellWidth: 10 }, // State RANK
-                    9: { cellWidth: 10 }, // Camp RANK
-                    10: { cellWidth: 10 }, // Sec RANK
-                    11: { cellWidth: 10, fillColor: [242, 230, 242], fontStyle: 'bold' }, // MAT (Lavender)
-                    12: { cellWidth: 10 }, // MAT RANK
-                    13: { cellWidth: 9 },  // MAT %
-                    14: { cellWidth: 10, fillColor: [242, 230, 242], fontStyle: 'bold' }, // PHY (Lavender)
-                    15: { cellWidth: 10 }, // PHY RANK
-                    16: { cellWidth: 9 },  // PHY %
-                    17: { cellWidth: 10, fillColor: [242, 230, 242], fontStyle: 'bold' }, // CHE (Lavender)
-                    18: { cellWidth: 10 }, // CHE RANK
-                    19: { cellWidth: 9 }   // CHE %
-                },
+                columnStyles: columnStyles,
                 margin: { left: 8, right: 8, top: 10, bottom: 10 },
                 tableWidth: 'auto',
                 rowPageBreak: 'avoid',
                 didParseCell: (data) => {
-                    if (data.section === 'body' && data.row.index === body.length - 1) {
-                        data.cell.styles.fontStyle = 'bold';
-                        data.cell.styles.fillColor = [235, 241, 245];
-                        if (data.column.index === 0) {
-                            data.cell.colSpan = 5;
+                    if (data.section === 'body') {
+                        const isTotalRow = (totals && data.row.index === body.length - 1);
+                        if (isTotalRow) {
+                            data.cell.styles.fontStyle = 'bold';
+                            data.cell.styles.fillColor = [235, 241, 245];
+                            if (data.column.index === 0) {
+                                const fColIdx = visibleColumns.findIndex(c => c.colLetter === 'F');
+                                if (fColIdx > 1) {
+                                    data.cell.colSpan = fColIdx;
+                                }
+                            }
+                        } else {
+                            const colLetter = visibleColumns[data.column.index].colLetter;
+                            // Marks columns: blue text & light purple/gray fill from template
+                            if (['F', 'L', 'O', 'R'].includes(colLetter)) {
+                                data.cell.styles.textColor = [0, 51, 204]; // #0033CC
+                                data.cell.styles.fillColor = [238, 230, 236]; // #EEE6EC
+                                data.cell.styles.fontStyle = 'bold';
+                            }
+                            // Rank columns: red text
+                            else if (['H', 'M', 'P', 'S'].includes(colLetter)) {
+                                data.cell.styles.textColor = [204, 51, 0]; // #CC3300
+                                data.cell.styles.fontStyle = 'bold';
+                            }
                         }
                     }
                 }
@@ -471,13 +582,10 @@ const AnalysisReport = ({ filters }) => {
             const testDate = examStats.length > 0 ? formatDate(examStats[0].DATE) : formatDate(new Date());
             const stream = (filters.stream && filters.stream.length > 0) ? filters.stream.join(',') : 'SR_ELITE';
             const testName = examStats.length > 0 ? examStats[0].Test : 'GRAND TEST';
-            const fullPattern = `${testDate}_${stream}_${testName}_All India Marks Analysis`.replace(/\//g, '-');
+            const headingName = currentHeading || "All India Marks Analysis";
+            const cleanHeading = headingName.replace(/[^a-zA-Z0-9\- _]/g, '').trim();
+            const fullPattern = `${testDate}_${stream}_${testName}_${cleanHeading}`;
             const progName = studentMarks[0]?.batch || stream;
-
-            // Update Row 4 Heading if customHeading is active
-            if (customHeading) {
-                worksheet.getCell('A4').value = customHeading.toUpperCase();
-            }
 
             // Update Metadata Rows 5, 6, 7
             worksheet.getCell('A5').value = `Prog Name:  ${progName}`;

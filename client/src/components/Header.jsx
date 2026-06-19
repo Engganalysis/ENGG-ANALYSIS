@@ -75,10 +75,10 @@ const Header = ({ title }) => {
                     </div>
                 ) : (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <h1>{currentHeading} - {title}</h1>
+                        <h1>ENGG Results - {title}</h1>
                         <button 
                             onClick={() => setIsEditing(true)} 
-                            title="Edit Custom Heading"
+                            title="Edit Custom PDF Heading"
                             style={{ 
                                 background: 'none', 
                                 border: 'none', 
