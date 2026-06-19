@@ -22,7 +22,7 @@ const getSubjectOrder = (subject) => {
 };
 
 const ErrorReport = ({ filters, setFilters }) => {
-    const { userData, isAdmin } = useAuth();
+    const { userData, isAdmin, currentHeading } = useAuth();
     // Use props filters
     const [subjectFilter, setSubjectFilter] = useState('ALL');
     const [showSubjects, setShowSubjects] = useState(false);
@@ -219,18 +219,13 @@ const ErrorReport = ({ filters, setFilters }) => {
         const drawMainHeader = (doc) => {
             let y = 15;
 
-            const part1 = "Sri Chaitanya";
-            const part2 = " Educational Institutions";
+            const titleText = currentHeading;
 
             // Font Prep for Measurements
             doc.setFontSize(26);
             if (impactFont) doc.setFont("Impact", "normal");
             else doc.setFont("helvetica", "bold");
-            const w1 = doc.getTextWidth(part1);
-
-            if (bookmanFont) doc.setFont("Bookman", "normal");
-            else doc.setFont("helvetica", "normal");
-            const w2 = doc.getTextWidth(part2);
+            const w1 = doc.getTextWidth(titleText);
 
             // LOGO Logic
             let logoW = 0;
@@ -241,7 +236,7 @@ const ErrorReport = ({ filters, setFilters }) => {
             }
 
             const gap = logoImg ? 4 : 0;
-            const totalWidth = logoW + gap + w1 + w2;
+            const totalWidth = logoW + gap + w1;
 
             const startX = (pageWidth - totalWidth) / 2;
             let currentX = startX;
@@ -249,7 +244,6 @@ const ErrorReport = ({ filters, setFilters }) => {
             // Draw Logo
             if (logoImg) {
                 // Slightly adjust Y to center vertically with text (text baseline is at y, image is top-left)
-                // Text size 26pt is roughly 9mm height. Logo is 12mm.
                 // We draw logo slightly higher to align centers visually
                 try {
                     doc.addImage(logoImg, 'PNG', currentX, y - 9, logoW, logoH);
@@ -257,17 +251,11 @@ const ErrorReport = ({ filters, setFilters }) => {
                 currentX += logoW + gap;
             }
 
-            // Draw Part 1
+            // Draw Title
             if (impactFont) doc.setFont("Impact", "normal");
             else doc.setFont("helvetica", "bold");
             doc.setTextColor(0, 112, 192);
-            doc.text(part1, currentX, y);
-
-            // Draw Part 2
-            if (bookmanFont) doc.setFont("Bookman", "normal");
-            else doc.setFont("helvetica", "normal");
-            doc.setTextColor(0, 112, 192);
-            doc.text(part2, currentX + w1, y);
+            doc.text(titleText, currentX, y);
 
             y += 8;
 
@@ -867,8 +855,7 @@ const ErrorReport = ({ filters, setFilters }) => {
                         {/* Header */}
                         <div style={{ textAlign: 'center', marginBottom: '15px' }}>
                             <div style={{ color: '#0070c0', marginBottom: '5px', display: 'flex', justifyContent: 'center', alignItems: 'flex-end' }}>
-                                <span style={{ fontFamily: 'Impact, sans-serif', fontSize: '26px' }}>Sri Chaitanya</span>
-                                <span style={{ fontFamily: '"Bookman Old Style", serif', fontSize: '26px', marginLeft: '5px' }}> Educational Institutions</span>
+                                <span style={{ fontFamily: 'Impact, sans-serif', fontSize: '26px' }}>{currentHeading}</span>
                             </div>
                             <div style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', marginTop: '4px', fontFamily: '"Bookman Old Style", serif' }}>
                                 A.P, TELANGANA, KARNATAKA, TAMILNADU, MAHARASHTRA, DELHI, RANCHI

@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { auth, db } from '../../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { API_URL } from '../../utils/apiHelper';
 
 const AuthContext = createContext();
 
@@ -53,6 +54,53 @@ export const AuthProvider = ({ children }) => {
         return unsubscribe;
     }, []);
 
+    const [customHeading, setCustomHeading] = useState('');
+    const [fileNamesHeading, setFileNamesHeading] = useState('');
+
+    // Fetch custom heading in real-time from Firestore
+    useEffect(() => {
+        const unsub = onSnapshot(doc(db, "settings", "heading"), (docSnap) => {
+            if (docSnap.exists()) {
+                setCustomHeading(docSnap.data().customHeading || '');
+            } else {
+                setCustomHeading('');
+            }
+        }, (err) => {
+            console.error("Error fetching custom heading:", err);
+        });
+        return unsub;
+    }, []);
+
+    // Fetch filename heading from API
+    useEffect(() => {
+        const fetchFiles = async () => {
+            try {
+                const res = await fetch(`${API_URL}/api/engg-files`);
+                if (res.ok) {
+                    const files = await res.json();
+                    if (files && files.length > 0) {
+                        setFileNamesHeading(files.join(' / '));
+                    }
+                }
+            } catch (err) {
+                console.error("Error fetching result filenames:", err);
+            }
+        };
+        fetchFiles();
+    }, []);
+
+    const updateCustomHeading = async (newHeading) => {
+        try {
+            await setDoc(doc(db, "settings", "heading"), {
+                customHeading: newHeading
+            });
+            return true;
+        } catch (err) {
+            console.error("Failed to update custom heading:", err);
+            throw err;
+        }
+    };
+
     const value = {
         currentUser,
         userData,
@@ -60,7 +108,11 @@ export const AuthProvider = ({ children }) => {
         isAdmin: userData?.role === 'admin',
         isCoAdmin: userData?.role === 'co_admin',
         isPrincipal: userData?.role === 'principal',
-        isApproved: userData?.isApproved
+        isApproved: userData?.isApproved,
+        customHeading,
+        fileNamesHeading,
+        currentHeading: customHeading || fileNamesHeading || "Sri Chaitanya Educational Institutions",
+        updateCustomHeading
     };
 
     return (

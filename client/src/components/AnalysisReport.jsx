@@ -11,7 +11,7 @@ import { logActivity } from '../utils/activityLogger';
 
 
 const AnalysisReport = ({ filters }) => {
-    const { userData } = useAuth();
+    const { userData, currentHeading } = useAuth();
     const [examStats, setExamStats] = useState([]);
     const [studentMarks, setStudentMarks] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -257,101 +257,128 @@ const AnalysisReport = ({ filters }) => {
 
             const pageWidth = doc.internal.pageSize.getWidth();
 
-            // 1. Draw Header Background (Pastel Plain)
-            const headerHeight = 62;
-            doc.setFillColor(240, 249, 255); // Light Pastel Blue (#F0F9FF)
-            doc.rect(0, 0, pageWidth, headerHeight, 'F');
-
-            // Subtle bottom border for the header
-            doc.setDrawColor(200, 220, 240);
-            doc.setLineWidth(0.2);
-            doc.line(0, headerHeight, pageWidth, headerHeight);
-
+            // 1. Draw Row 1: Logo + Sri Chaitanya IIT Academy.,India.
             let currentY = 10;
-
-            // --- HEADER LAYOUT ---
-            const logoH = 22;
-            let logoW = 22;
+            const logoH = 12;
+            let logoW = 12;
             if (logoImg) {
                 const aspect = logoImg.width / logoImg.height;
                 logoW = logoH * aspect;
-                const logoX = (pageWidth - logoW) / 2;
-                doc.addImage(logoImg, 'PNG', logoX, currentY, logoW, logoH, undefined, 'FAST');
-                currentY += logoH + 2;
             }
+            
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(22);
+            const titleText = "Sri Chaitanya IIT Academy.,India.";
+            const titleW = doc.getTextWidth(titleText);
+            const gap = logoImg ? 4 : 0;
+            const row1Width = logoW + gap + titleW;
+            const row1StartX = (pageWidth - row1Width) / 2;
 
-            const part1 = "Sri Chaitanya";
-            const part2 = " Educational Institutions";
-            doc.setFontSize(34);
+            if (logoImg) {
+                doc.addImage(logoImg, 'PNG', row1StartX, currentY, logoW, logoH, undefined, 'FAST');
+            }
+            doc.setTextColor(0, 112, 192); // #0070C0
+            doc.text(titleText, row1StartX + logoW + gap, currentY + 9);
+            currentY += 14;
 
-            if (impactFont) doc.setFont("Impact", "normal");
-            else doc.setFont("helvetica", "bold");
-            const w1 = doc.getTextWidth(part1);
+            // 2. Draw Row 2: Location list
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(7.5);
+            doc.setTextColor(227, 0, 127); // Magenta/Pinkish
+            const locText = "A.P  T.S  KARNATAKA  TAMILNADU  MAHARASTRA  DELHI  RANCHI";
+            doc.text(locText, pageWidth / 2, currentY, { align: 'center' });
+            currentY += 5;
 
-            doc.setFont("helvetica", "normal");
-            const w2 = doc.getTextWidth(part2);
+            // 3. Draw Row 3: ICON Central Office
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(10);
+            doc.setTextColor(0, 0, 0); // Black
+            const iconText = "ICON Central Office - Madhapur - Hyderabad";
+            doc.text(iconText, pageWidth / 2, currentY, { align: 'center' });
+            currentY += 6;
 
-            const totalTitleWidth = w1 + w2;
-            const titleStartX = (pageWidth - totalTitleWidth) / 2;
+            // 4. Draw Row 4: ALL INDIA MARKS ANALYSIS (or customHeading)
+            const row4Height = 8;
+            doc.setFillColor(0, 112, 192); // Blue background
+            doc.rect(10, currentY, pageWidth - 20, row4Height, 'F');
+            
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(13);
+            doc.setTextColor(255, 255, 255); // White
+            const headingText = currentHeading || "ALL INDIA MARKS ANALYSIS";
+            doc.text(headingText.toUpperCase(), pageWidth / 2, currentY + 6, { align: 'center' });
+            currentY += row4Height + 5;
 
-            if (impactFont) doc.setFont("Impact", "normal");
-            else doc.setFont("helvetica", "bold");
-            doc.setTextColor(0, 80, 160); // Darker blue for contrast
-            doc.text(part1, titleStartX, currentY + 10);
-
-            doc.setFont("helvetica", "normal");
-            doc.setTextColor(20, 60, 120);
-            doc.text(part2, titleStartX + w1, currentY + 10);
-
-            currentY += 22;
-
+            // 5. Draw Row 5, 6, 7: Metadata (Prog Name, Test Date, Test Name)
             const testDate = examStats.length > 0 ? formatDate(examStats[0].DATE) : formatDate(new Date());
             const stream = (filters.stream && filters.stream.length > 0) ? filters.stream.join(',') : 'SR_ELITE';
             const testName = examStats.length > 0 ? examStats[0].Test : 'GRAND TEST';
             const fullPattern = `${testDate}_${stream}_${testName}_All India Marks Analysis`.replace(/\//g, '-');
+            const progName = studentMarks[0]?.batch || stream;
 
-            doc.setFont("helvetica", "bolditalic");
-            doc.setFontSize(16);
-            doc.setTextColor(110, 0, 50); // Deep Maroon
-            doc.text(fullPattern, pageWidth / 2, currentY, { align: 'center', maxWidth: pageWidth - 20 });
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(10);
+            doc.setTextColor(0, 112, 192); // Blue text
+            
+            doc.text(`Prog Name:  ${progName}`, 10, currentY);
+            currentY += 5;
+            doc.text(`Test Date:   ${testDate}`, 10, currentY);
+            currentY += 5;
+            doc.text(`Test Name:  ${testName}`, 10, currentY);
+            currentY += 8;
 
-            currentY += 10;
-
-            // 4. Data Tables
-            const showMax = examStats.length === 1;
+            // 6. Data Tables - Replicating the 20 columns layout
             const tableColumn = [
-                { content: "STUD ID", rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
-                { content: "NAME OF THE STUDENT", rowSpan: 2, styles: { halign: 'left', valign: 'middle' } },
-                { content: "CAMPUS NAME", rowSpan: 2, styles: { halign: 'left', valign: 'middle' } },
-                { content: showMax ? `Total\n(${Math.round(studentMarks[0]?.max_tot || 300)})` : "Total", rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [255, 255, 204] } },
-                { content: "AIR", rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [255, 255, 153] } },
-                { content: showMax ? `Mathematics\n(${Math.round(studentMarks[0]?.max_mat || 100)})` : "Mathematics", colSpan: 2, styles: { halign: 'center', fillColor: [253, 233, 217] } },
-                { content: showMax ? `Physics\n(${Math.round(studentMarks[0]?.max_phy || 100)})` : "Physics", colSpan: 2, styles: { halign: 'center', fillColor: [235, 241, 222] } },
-                { content: showMax ? `Chemistry\n(${Math.round(studentMarks[0]?.max_che || 100)})` : "Chemistry", colSpan: 2, styles: { halign: 'center', fillColor: [242, 220, 219] } }
+                "STUD_ID", "NAME OF THE STUDENT", "SEC", "TEST_MODE", "CAMPUS NAME", 
+                "TOT", "%", "AIR RANK", "State RANK", "Camp RANK", "Sec RANK", 
+                "MAT", "MAT RANK", "%", "PHY", "PHY RANK", "%", "CHE", "CHE RANK", "%"
             ];
 
             const subHeader = [
-                { content: "MAT", styles: { halign: 'center', textColor: [0, 0, 0], fillColor: [253, 233, 217] } },
-                { content: "RANK", styles: { halign: 'center', textColor: [0, 0, 0], fillColor: [253, 233, 217] } },
-                { content: "PHY", styles: { halign: 'center', textColor: [0, 0, 0], fillColor: [235, 241, 222] } },
-                { content: "RANK", styles: { halign: 'center', textColor: [0, 0, 0], fillColor: [235, 241, 222] } },
-                { content: "CHEM", styles: { halign: 'center', textColor: [0, 0, 0], fillColor: [242, 220, 219] } },
-                { content: "RANK", styles: { halign: 'center', textColor: [0, 0, 0], fillColor: [242, 220, 219] } }
+                "", "", "", "", "", "300", "", "", "", "", "", "100", "", "", "100", "", "", "100", "", ""
             ];
 
             const body = studentMarks.map(row => [
                 row.STUD_ID || '',
                 (row.name || '').toUpperCase(),
+                row.sec || '',
+                row.test_mode || '',
                 (row.campus || '').toUpperCase(),
                 Math.round(row.tot || 0),
+                row.max_tot ? ((row.tot / row.max_tot) * 100).toFixed(1) : '0.0',
                 Math.round(row.air) || '-',
+                row.state_rank || '',
+                row.camp_rank || '',
+                row.sec_rank || '',
                 Math.round(row.mat || 0),
                 Math.round(row.m_rank || 0),
+                row.max_mat ? ((row.mat / row.max_mat) * 100).toFixed(1) : '0.0',
                 Math.round(row.phy || 0),
                 Math.round(row.p_rank || 0),
+                row.max_phy ? ((row.phy / row.max_phy) * 100).toFixed(1) : '0.0',
                 Math.round(row.che || 0),
-                Math.round(row.c_rank || 0)
+                Math.round(row.c_rank || 0),
+                row.max_che ? ((row.che / row.max_che) * 100).toFixed(1) : '0.0'
             ]);
+
+            if (totals) {
+                body.push([
+                    'Campus Selection Average', '', '', '', '',
+                    Number(totals.tot || 0).toFixed(1),
+                    '',
+                    Math.round(totals.air) || '-',
+                    '', '', '',
+                    Number(totals.mat || 0).toFixed(1),
+                    Number(totals.m_rank || 0).toFixed(1),
+                    '',
+                    Number(totals.phy || 0).toFixed(1),
+                    Number(totals.p_rank || 0).toFixed(1),
+                    '',
+                    Number(totals.che || 0).toFixed(1),
+                    Number(totals.c_rank || 0).toFixed(1),
+                    ''
+                ]);
+            }
 
             autoTable(doc, {
                 head: [tableColumn, subHeader],
@@ -359,47 +386,56 @@ const AnalysisReport = ({ filters }) => {
                 startY: currentY,
                 theme: 'grid',
                 styles: {
-                    fontSize: 11, // Body font size
-                    cellPadding: 0.8, // Slightly more compact to save rows
+                    fontSize: 7, // Small font size to fit all 20 columns
+                    cellPadding: 0.5,
                     halign: 'center',
                     valign: 'middle',
                     lineColor: [173, 216, 230], // Standard LightBlue #ADD8E6
-                    lineWidth: 0.15,
-                    textColor: [0, 0, 0], // Default black
+                    lineWidth: 0.1,
+                    textColor: [0, 0, 0],
                     font: "helvetica",
-                    fontStyle: 'bold'
+                    fontStyle: 'normal'
                 },
                 headStyles: {
-                    fillColor: [255, 255, 255],
-                    textColor: [0, 0, 0], // Pure Black headers
+                    fillColor: [0, 112, 192], // Blue headers matching theme
+                    textColor: [255, 255, 255], // White text
                     fontStyle: 'bold',
-                    lineWidth: 0.2, // Slightly thicker border for headers
-                    fontSize: 10, // Header font size 10pt as requested
-                    cellPadding: 0.8 // Compact headers
+                    lineWidth: 0.15,
+                    fontSize: 7.5,
+                    cellPadding: 0.6
                 },
                 columnStyles: {
-                    0: { cellWidth: 20, fillColor: [255, 255, 255] }, // STUD ID
-                    1: { halign: 'left', cellWidth: 60, fillColor: [255, 255, 255] }, // NAME
-                    2: { halign: 'left', cellWidth: 50, fillColor: [255, 255, 255] }, // CAMPUS
-                    3: { cellWidth: 20, fillColor: [255, 255, 204] }, // Total
-                    4: { cellWidth: 20, fillColor: [255, 255, 255], textColor: [0, 0, 0] }, // AIR
-                    5: { cellWidth: 20, fillColor: [253, 233, 217] }, // MAT Marks
-                    6: { cellWidth: 15, fillColor: [255, 255, 255] }, // MAT Rank
-                    7: { cellWidth: 20, fillColor: [235, 241, 222] }, // Physics Marks
-                    8: { cellWidth: 15, fillColor: [255, 255, 255] }, // Physics Rank
-                    9: { cellWidth: 20, fillColor: [242, 220, 219] }, // Chem Marks
-                    10: { cellWidth: 15, fillColor: [255, 255, 255] }  // Chem Rank
+                    0: { cellWidth: 15 }, // STUD_ID
+                    1: { halign: 'left', cellWidth: 32 }, // NAME
+                    2: { cellWidth: 8 },  // SEC
+                    3: { cellWidth: 15 }, // TEST_MODE
+                    4: { halign: 'left', cellWidth: 26 }, // CAMPUS NAME
+                    5: { cellWidth: 10, fillColor: [242, 230, 242], fontStyle: 'bold' }, // TOT (Lavender)
+                    6: { cellWidth: 9 },  // TOT %
+                    7: { cellWidth: 10 }, // AIR RANK
+                    8: { cellWidth: 10 }, // State RANK
+                    9: { cellWidth: 10 }, // Camp RANK
+                    10: { cellWidth: 10 }, // Sec RANK
+                    11: { cellWidth: 10, fillColor: [242, 230, 242], fontStyle: 'bold' }, // MAT (Lavender)
+                    12: { cellWidth: 10 }, // MAT RANK
+                    13: { cellWidth: 9 },  // MAT %
+                    14: { cellWidth: 10, fillColor: [242, 230, 242], fontStyle: 'bold' }, // PHY (Lavender)
+                    15: { cellWidth: 10 }, // PHY RANK
+                    16: { cellWidth: 9 },  // PHY %
+                    17: { cellWidth: 10, fillColor: [242, 230, 242], fontStyle: 'bold' }, // CHE (Lavender)
+                    18: { cellWidth: 10 }, // CHE RANK
+                    19: { cellWidth: 9 }   // CHE %
                 },
-                margin: { left: 9, right: 9, top: 15, bottom: 15 },
-                tableWidth: 'auto', // Let it take full width between margins
-                rowPageBreak: 'avoid', // Prevent rows from splitting across pages (Corrected placement)
-                didDrawPage: (data) => {
-                    // Page watermark removed for pastel plain design
-                },
+                margin: { left: 8, right: 8, top: 10, bottom: 10 },
+                tableWidth: 'auto',
+                rowPageBreak: 'avoid',
                 didParseCell: (data) => {
-                    // Reduce font size for first 3 columns to 10pt as requested
-                    if (data.section === 'body' && (data.column.index === 0 || data.column.index === 1 || data.column.index === 2)) {
-                        data.cell.styles.fontSize = 10;
+                    if (data.section === 'body' && data.row.index === body.length - 1) {
+                        data.cell.styles.fontStyle = 'bold';
+                        data.cell.styles.fillColor = [235, 241, 245];
+                        if (data.column.index === 0) {
+                            data.cell.colSpan = 5;
+                        }
                     }
                 }
             });
@@ -420,139 +456,135 @@ const AnalysisReport = ({ filters }) => {
 
     const downloadExcel = async () => {
         try {
+            // Load template from public folder
+            const response = await fetch('/Result Template.xlsx');
+            const arrayBuffer = await response.arrayBuffer();
             const workbook = new ExcelJS.Workbook();
-            const worksheet = workbook.addWorksheet('Analysis Report');
-
-            // 1. Add Title (Merged Row 1)
-            // Excel Export - split lines? Excel merges are tricky for multi-color in one cell.
-            // We'll keep it one cell but change color to main Blue #0070C0
-            worksheet.addRow(['SRI CHAITANYA EDUCATIONAL INSTITUTIONS']);
-            worksheet.mergeCells('A1:O1');
-            const titleCell = worksheet.getCell('A1');
-            titleCell.font = { name: 'Impact', size: 28, bold: true, color: { argb: 'FF0070C0' } }; // Increased Size
-            titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-            worksheet.getRow(1).height = 40; // Adjusted height for larger font
-
-            // 2. Add Subtitle (Pattern Row 2)
+            await workbook.xlsx.load(arrayBuffer);
+            
+            // Get Main(Micro) sheet
+            let worksheet = workbook.getWorksheet('Main(Micro)');
+            if (!worksheet) {
+                worksheet = workbook.worksheets.find(s => s.name.includes('Main') || s.name.includes('Micro')) || workbook.worksheets[0];
+            }
+            
             const testDate = examStats.length > 0 ? formatDate(examStats[0].DATE) : formatDate(new Date());
             const stream = (filters.stream && filters.stream.length > 0) ? filters.stream.join(',') : 'SR_ELITE';
             const testName = examStats.length > 0 ? examStats[0].Test : 'GRAND TEST';
             const fullPattern = `${testDate}_${stream}_${testName}_All India Marks Analysis`.replace(/\//g, '-');
+            const progName = studentMarks[0]?.batch || stream;
 
-            worksheet.addRow([fullPattern]);
-            worksheet.mergeCells('A2:O2');
-            const subTitleCell = worksheet.getCell('A2');
-            subTitleCell.font = { size: 14, bold: true, italic: true, color: { argb: 'FF800040' } };
-            subTitleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-            worksheet.getRow(2).height = 20; // Reduced height to tighten space
+            // Update Row 4 Heading if customHeading is active
+            if (customHeading) {
+                worksheet.getCell('A4').value = customHeading.toUpperCase();
+            }
 
-            // Empty spacer row
-            worksheet.addRow([]);
+            // Update Metadata Rows 5, 6, 7
+            worksheet.getCell('A5').value = `Prog Name:  ${progName}`;
+            worksheet.getCell('A6').value = `Test Date:   ${testDate}`;
+            worksheet.getCell('A7').value = `Test Name:  ${testName}`;
 
-            // 3. Multi-level Headers (Rows 4 & 5)
-            const showMax = examStats.length === 1;
-            const headerRow4Values = [
-                'STUD ID', 'NAME OF THE STUDENT', 'CAMPUS NAME',
-                showMax ? `Total (${Math.round(studentMarks[0]?.max_tot || 300)})` : 'Total',
-                'AIR',
-                showMax ? `Mathematics (${Math.round(studentMarks[0]?.max_mat || 100)})` : 'Mathematics', '',
-                showMax ? `Physics (${Math.round(studentMarks[0]?.max_phy || 100)})` : 'Physics', '',
-                showMax ? `Chemistry (${Math.round(studentMarks[0]?.max_che || 100)})` : 'Chemistry', '',
-                'EXAMS'
-            ];
-            worksheet.addRow(headerRow4Values);
-            worksheet.mergeCells('F4:G4');
-            worksheet.mergeCells('H4:I4');
-            worksheet.mergeCells('J4:K4');
-            // Merge single column headers vertically
-            ['A', 'B', 'C', 'D', 'E', 'L'].forEach(col => {
-                worksheet.mergeCells(`${col}4:${col}5`);
+            // Save row styles from row 10 and 11
+            const row10Styles = [];
+            const row11Styles = [];
+            const row10 = worksheet.getRow(10);
+            const row11 = worksheet.getRow(11);
+            
+            row10.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+                row10Styles[colNumber] = cell.style;
             });
-
-            const headerRow5Values = [
-                '', '', '', '', '',
-                'MAT', 'RANK', 'PHY', 'RANK', 'CHEM', 'RANK', ''
-            ];
-            worksheet.addRow(headerRow5Values);
-
-            // Style headers
-            [4, 5].forEach(rowNum => {
-                const row = worksheet.getRow(rowNum);
-                row.eachCell(cell => {
-                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF000000' } };
-                    cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 10 };
-                    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-                    cell.border = {
-                        top: { style: 'thin', color: { argb: 'FFFFFFFF' } },
-                        left: { style: 'thin', color: { argb: 'FFFFFFFF' } },
-                        bottom: { style: 'thin', color: { argb: 'FFFFFFFF' } },
-                        right: { style: 'thin', color: { argb: 'FFFFFFFF' } }
-                    };
-                });
+            row11.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+                row11Styles[colNumber] = cell.style;
             });
+            const row10Height = row10.height;
+            const row11Height = row11.height;
 
-            // Set column widths
-            worksheet.columns = [
-                { width: 15 }, { width: 35 }, { width: 25 }, { width: 12 }, { width: 12 },
-                { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 },
-                { width: 12 }, { width: 12 }
-            ];
+            // Clear empty template rows from 10 to end
+            const originalRowCount = worksheet.rowCount;
+            if (originalRowCount >= 10) {
+                worksheet.spliceRows(10, originalRowCount - 9);
+            }
 
-            // 4. Add Data Rows
-            studentMarks.forEach(student => {
+            // Populate Student Data Rows
+            studentMarks.forEach((student, index) => {
+                const targetRowNum = 10 + index;
                 const rowData = [
                     student.STUD_ID,
                     (student.name || '').toUpperCase(),
+                    student.sec || '',
+                    student.test_mode || '',
                     (student.campus || '').toUpperCase(),
-                    Number(student.tot || 0).toFixed(1),
+                    Math.round(student.tot || 0),
+                    student.max_tot ? Number((student.tot / student.max_tot) * 100).toFixed(1) : '0.0',
                     Math.round(student.air) || '-',
-                    Number(student.mat || 0).toFixed(1),
-                    Number(student.m_rank || 0).toFixed(1),
-                    Number(student.phy || 0).toFixed(1),
-                    Number(student.p_rank || 0).toFixed(1),
-                    Number(student.che || 0).toFixed(1),
-                    Number(student.c_rank || 0).toFixed(1),
-                    student.t_app
+                    student.state_rank || '',
+                    student.camp_rank || '',
+                    student.sec_rank || '',
+                    Math.round(student.mat || 0),
+                    Math.round(student.m_rank || 0),
+                    student.max_mat ? Number((student.mat / student.max_mat) * 100).toFixed(1) : '0.0',
+                    Math.round(student.phy || 0),
+                    Math.round(student.p_rank || 0),
+                    student.max_phy ? Number((student.phy / student.max_phy) * 100).toFixed(1) : '0.0',
+                    Math.round(student.che || 0),
+                    Math.round(student.c_rank || 0),
+                    student.max_che ? Number((student.che / student.max_che) * 100).toFixed(1) : '0.0'
                 ];
-                const row = worksheet.addRow(rowData);
-
-                row.eachCell((cell, colNumber) => {
-                    cell.alignment = { horizontal: colNumber <= 3 ? 'left' : 'center', vertical: 'middle' };
-                    cell.font = { size: 10, bold: colNumber === 4 || colNumber === 10 };
-                    cell.border = {
-                        top: { style: 'thin', color: { argb: 'FFADD8E6' } },
-                        left: { style: 'thin', color: { argb: 'FFADD8E6' } },
-                        bottom: { style: 'thin', color: { argb: 'FFADD8E6' } },
-                        right: { style: 'thin', color: { argb: 'FFADD8E6' } }
-                    };
-
-                    // Background Colors matching PDF
-                    if (colNumber === 4) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFCC' } }; // Yellow
-                    if (colNumber === 6 || colNumber === 7) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDE9D9' } }; // Orange
-                    if (colNumber === 8 || colNumber === 9) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEBF1DE' } }; // Green pale
-                    if (colNumber === 10 || colNumber === 11) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2DCDB' } }; // Pink pale
+                
+                const newRow = worksheet.getRow(targetRowNum);
+                newRow.values = rowData;
+                
+                // Copy styles (alternating colors)
+                const isEven = (index % 2 === 0);
+                const templateStyles = isEven ? row10Styles : row11Styles;
+                newRow.height = isEven ? row10Height : row11Height;
+                
+                templateStyles.forEach((style, colNumber) => {
+                    if (style) {
+                        newRow.getCell(colNumber).style = style;
+                    }
                 });
             });
 
-            // 5. Add Totals Row
+            // Populate Totals Row at the bottom
             if (totals) {
+                const totalRowNum = 10 + studentMarks.length;
                 const totalRowData = [
-                    'Campus Selection Average', '', '',
-                    totals.tot, totals.air, totals.mat, totals.m_rank,
-                    totals.phy, totals.p_rank, totals.che, totals.c_rank, ''
+                    'Campus Selection Average', '', '', '', '',
+                    Number(totals.tot || 0).toFixed(1),
+                    '',
+                    Math.round(totals.air) || '-',
+                    '', '', '',
+                    Number(totals.mat || 0).toFixed(1),
+                    Number(totals.m_rank || 0).toFixed(1),
+                    '',
+                    Number(totals.phy || 0).toFixed(1),
+                    Number(totals.p_rank || 0).toFixed(1),
+                    '',
+                    Number(totals.che || 0).toFixed(1),
+                    Number(totals.c_rank || 0).toFixed(1),
+                    ''
                 ];
-                const totalRow = worksheet.addRow(totalRowData);
-                worksheet.mergeCells(`A${totalRow.number}:C${totalRow.number}`);
-
-                totalRow.eachCell(cell => {
-                    cell.font = { bold: true, size: 10 };
-                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E7FF' } };
-                    cell.border = {
-                        top: { style: 'thin', color: { argb: 'FF000000' } },
-                        left: { style: 'thin', color: { argb: 'FF000000' } },
-                        bottom: { style: 'thin', color: { argb: 'FF000000' } },
-                        right: { style: 'thin', color: { argb: 'FF000000' } }
-                    };
+                const totalRow = worksheet.getRow(totalRowNum);
+                totalRow.values = totalRowData;
+                
+                // Merge A to E
+                worksheet.mergeCells(`A${totalRowNum}:E${totalRowNum}`);
+                
+                // Style Totals Row
+                totalRow.height = row10Height;
+                row10Styles.forEach((style, colNumber) => {
+                    if (style) {
+                        const cell = totalRow.getCell(colNumber);
+                        cell.style = style;
+                        cell.font = { ...style.font, bold: true };
+                        // Add light tint background color for totals row
+                        cell.fill = {
+                            type: 'pattern',
+                            pattern: 'solid',
+                            fgColor: { argb: 'FFEBF1F5' } // Very light slate gray
+                        };
+                    }
                 });
             }
 

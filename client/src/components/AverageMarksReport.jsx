@@ -11,7 +11,7 @@ import { Trophy, AlertCircle, FileSpreadsheet, FileText } from 'lucide-react';
 
 
 const AverageMarksReport = ({ filters }) => {
-    const { userData } = useAuth();
+    const { userData, currentHeading } = useAuth();
     const [data, setData] = useState([]);
     const [examMeta, setExamMeta] = useState([]);
     const [totalConducted, setTotalConducted] = useState(0);
@@ -155,15 +155,11 @@ const AverageMarksReport = ({ filters }) => {
             border: borderStyle
         });
 
-        // ROW 1: Logo + SRI CHAITANYA... Header (Merged A1:M1)
+        // ROW 1: Logo + Header (Merged A1:M1)
         worksheet.mergeCells('A1:M1');
         const row1 = worksheet.getCell('A1');
-        row1.value = {
-            richText: [
-                { text: '          Sri Chaitanya ', font: { name: 'Impact', size: 32, color: { argb: 'FF00B0F0' } } },
-                { text: 'Educational Institutions., India', font: { name: 'Gill Sans MT', size: 32, color: { argb: 'FF00B0F0' } } }
-            ]
-        };
+        row1.value = currentHeading.toUpperCase();
+        row1.font = { name: 'Impact', size: 28, bold: true, color: { argb: 'FF00B0F0' } };
         row1.alignment = { horizontal: 'center', vertical: 'middle' };
         row1.border = borderStyle;
         worksheet.getRow(1).height = 50;

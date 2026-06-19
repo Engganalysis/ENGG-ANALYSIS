@@ -2,6 +2,7 @@ const XLSX = require('xlsx');
 const path = require('path');
 const { connectToDb } = require('./db');
 const fs = require('fs');
+const readlineSync = require('readline-sync');
 
 const CONFIG_PATH = path.join(__dirname, '..', 'Uploader_Config.xlsx');
 const RESULT_DIR = path.join(__dirname, '..', 'Result');
@@ -11,6 +12,16 @@ async function run() {
     try {
         const pool = await connectToDb();
         console.log("Connected to TiDB.");
+
+        // Ensure ENGG_FILES table exists
+        await pool.request().query(`
+            CREATE TABLE IF NOT EXISTS ENGG_FILES (
+                filename VARCHAR(255) NOT NULL PRIMARY KEY
+            )
+        `);
+
+        // Clear existing files
+        await pool.request().query(`DELETE FROM ENGG_FILES`);
 
         // Clear or initialize log file
         fs.writeFileSync(LOG_PATH, `=== UPLOADER LOG: ${new Date().toLocaleString()} ===\n\n`);
@@ -48,6 +59,15 @@ async function run() {
         const files = findResultFiles(RESULT_DIR);
         console.log(`Found ${files.length} result files to process.`);
 
+        // Insert active filenames into ENGG_FILES table
+        if (files.length > 0) {
+            const fileValues = files.map(file => {
+                const baseName = path.basename(file, '.xlsx');
+                return `('${baseName.replace(/'/g, "''")}')`;
+            }).join(',');
+            await pool.request().query(`INSERT IGNORE INTO ENGG_FILES (filename) VALUES ${fileValues}`);
+        }
+
         const processedGroups = new Set();
         for (const file of files) {
             console.log(`\nProcessing: ${path.basename(file)}`);
@@ -72,8 +92,7 @@ function findResultFiles(dir) {
         if (stat.isDirectory()) {
             results = results.concat(findResultFiles(fullPath));
         } else {
-            const normalized = file.toUpperCase().replace(/_/g, ' ');
-            if (normalized.includes('ALL INDIA MARKS ANALYSIS') && file.endsWith('.xlsx') && !file.startsWith('~$')) {
+            if (file.endsWith('.xlsx') && !file.startsWith('~$')) {
                 results.push(fullPath);
             }
         }
@@ -187,8 +206,10 @@ function isKarnatakaCampus(name, allowedCampuses) {
 
 async function processResultFile(filePath, pool, topIds, allowedCampuses, processedGroups) {
     const wb = XLSX.readFile(filePath);
+    let batch = '', dateStr = '', testName = '', headerRowIdx = -1;
+
     // Find the right sheet. Usually the last one or named like Main(Micro) or All-India...
-    let sheetName = wb.SheetNames.find(s => s.includes('Main') || s.includes('All-India') || s.includes('Micro') || s.includes('Adv'));
+    let sheetName = wb.SheetNames.find(s => s.includes('Main') || s.includes('All-India') || s.includes('Micro') || s.includes('Adv') || s.includes('Main(Micro)'));
 
     // If no obvious match, look for a sheet that contains 'STUD_ID' in the first 20 rows
     if (!sheetName) {
@@ -203,7 +224,18 @@ async function processResultFile(filePath, pool, topIds, allowedCampuses, proces
         }
     }
 
-    if (!sheetName) sheetName = wb.SheetNames[0];
+    if (!sheetName) {
+        console.log(`\n⚠️ No matching sheet name found in "${path.basename(filePath)}".`);
+        console.log("Available sheets are:");
+        wb.SheetNames.forEach((name, idx) => console.log(`  [${idx + 1}] ${name}`));
+        
+        const index = readlineSync.keyInSelect(wb.SheetNames, "Please select the sheet to process:");
+        if (index === -1) {
+            console.log("❌ Skip processing this file.");
+            return;
+        }
+        sheetName = wb.SheetNames[index];
+    }
 
     console.log(`  Using Sheet: [${sheetName}]`);
     const ws = wb.Sheets[sheetName];

@@ -122,6 +122,25 @@ const buildWhereClause = (req, options = {}) => {
     return where;
 };
 
+// Get list of engineering result filenames processed in DB
+app.get('/api/engg-files', async (req, res) => {
+    try {
+        const pool = await connectToDb();
+        // Ensure table exists (in case uploader has not run yet)
+        await pool.request().query(`
+            CREATE TABLE IF NOT EXISTS ENGG_FILES (
+                filename VARCHAR(255) NOT NULL PRIMARY KEY
+            )
+        `);
+        const result = await pool.request().query(`SELECT filename FROM ENGG_FILES`);
+        const files = result.recordset.map(row => row.filename);
+        res.json(files);
+    } catch (err) {
+        console.error("Error fetching engg files:", err);
+        res.json([]); // Return empty array on error to prevent UI break
+    }
+});
+
 // Get Filter Options
 app.get('/api/filters', async (req, res) => {
     try {
@@ -491,6 +510,7 @@ app.get('/api/analysis-report', async (req, res) => {
                 STUD_ID,
                 MAX(NAME_OF_THE_STUDENT) as name,
                 MAX(CAMPUS_NAME) as campus,
+                MAX(Batch) as batch,
                 AVG(CAST(Total as DECIMAL(10,2))) as tot,
                 AVG(CAST(AIR as DECIMAL(10,2))) as air,
                 AVG(CAST(MAT as DECIMAL(10,2))) as mat,

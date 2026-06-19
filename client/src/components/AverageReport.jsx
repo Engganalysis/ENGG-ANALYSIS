@@ -11,7 +11,7 @@ import { useAuth } from './auth/AuthProvider';
 import { logActivity } from '../utils/activityLogger';
 
 const AverageReport = ({ filters }) => {
-    const { userData } = useAuth();
+    const { userData, currentHeading } = useAuth();
     const [history, setHistory] = useState({ history: [], batchExams: [] });
     const [loading, setLoading] = useState(false);
     const [hasSearched, setHasSearched] = useState(false);
@@ -166,30 +166,17 @@ const AverageReport = ({ filters }) => {
                 currentY += 10;
             }
 
-            const part1 = "Sri Chaitanya";
-            const part2 = " Educational Institutions";
-            doc.setFontSize(26);
+            const titleText = currentHeading;
+            doc.setFontSize(22);
 
             if (impactFont) doc.setFont("Impact", "normal");
             else doc.setFont("helvetica", "bold");
-            const w1 = doc.getTextWidth(part1);
 
-            if (bookmanFont) doc.setFont("Bookman", "normal");
-            else doc.setFont("helvetica", "normal");
-            const w2 = doc.getTextWidth(part2);
-
-            const totalWidth = w1 + w2;
+            const totalWidth = doc.getTextWidth(titleText);
             const startX = (210 - totalWidth) / 2;
 
-            if (impactFont) doc.setFont("Impact", "normal");
-            else doc.setFont("helvetica", "bold");
             doc.setTextColor(0, 112, 192);
-            doc.text(part1, startX, currentY);
-
-            if (bookmanFont) doc.setFont("Bookman", "normal");
-            else doc.setFont("helvetica", "normal");
-            doc.setTextColor(0, 102, 204);
-            doc.text(part2, startX + w1, currentY);
+            doc.text(titleText, startX, currentY);
 
             currentY += 8;
 
