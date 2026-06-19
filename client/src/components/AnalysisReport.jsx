@@ -354,15 +354,25 @@ const AnalysisReport = ({ filters }) => {
 
             const fullPattern = `${testDate}_${stream}_${testName}_All India Marks Analysis`;
 
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(10);
-            doc.setTextColor(0, 112, 192); // Blue text
-            
-            doc.text(`Prog Name:  ${progName}`, 10, currentY);
+            const drawRichTextRow = (label, value, y) => {
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(10);
+                doc.setTextColor(0, 0, 0); // Black label
+                doc.text(label, 10, y);
+                
+                const labelWidth = doc.getTextWidth(label);
+                
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(11); // Slightly larger
+                doc.setTextColor(0, 176, 240); // Light blue (#00B0F0) value
+                doc.text(value, 10 + labelWidth, y);
+            };
+
+            drawRichTextRow("Prog Name:  ", progName, currentY);
             currentY += 5;
-            doc.text(`Test Date:   ${testDate}`, 10, currentY);
+            drawRichTextRow("Test Date:   ", testDate, currentY);
             currentY += 5;
-            doc.text(`Test Name:  ${testName}`, 10, currentY);
+            drawRichTextRow("Test Name:  ", testName, currentY);
             currentY += 8;
 
             // 6. Inspect columns in the template sheet to determine visibility and headers
@@ -462,9 +472,52 @@ const AnalysisReport = ({ filters }) => {
                 visibleColumns.push(...fallbackColumns);
             }
 
-            // Build dynamic headers (Row 8 & Row 9)
-            const tableColumn = visibleColumns.map(col => col.val8);
-            const subHeader = visibleColumns.map(col => col.val9);
+            // Build dynamic headers (Row 7, Row 8 & Row 9)
+            const syllabusRow = [];
+            const tableColumn = [];
+            const subHeader = [];
+
+            visibleColumns.forEach(col => {
+                const cell7 = worksheet ? worksheet.getCell(`${col.colLetter}7`) : null;
+                let val7 = getCellValueAsString(cell7).trim().replace(/\r?\n/g, ' ').replace(/\s+/g, ' ');
+                if (val7.startsWith("Test Name:")) {
+                    val7 = '';
+                }
+                syllabusRow.push(val7);
+                tableColumn.push(col.val8);
+                subHeader.push(col.val9);
+            });
+
+            const hasSyllabus = syllabusRow.some(val => val !== '');
+            const headers = [];
+            const syllabusColSpans = [];
+
+            if (hasSyllabus) {
+                headers.push(syllabusRow);
+                
+                // Calculate colSpans for syllabus row
+                let i = 0;
+                while (i < syllabusRow.length) {
+                    const val = syllabusRow[i];
+                    if (val === '') {
+                        let span = 1;
+                        while (i + span < syllabusRow.length && syllabusRow[i + span] === '') {
+                            span++;
+                        }
+                        syllabusColSpans.push({ index: i, span });
+                        i += span;
+                    } else {
+                        let span = 1;
+                        while (i + span < syllabusRow.length && syllabusRow[i + span] === val) {
+                            span++;
+                        }
+                        syllabusColSpans.push({ index: i, span });
+                        i += span;
+                    }
+                }
+            }
+            headers.push(tableColumn);
+            headers.push(subHeader);
 
             const getStudentFieldValue = (student, field) => {
                 switch (field) {
@@ -555,7 +608,7 @@ const AnalysisReport = ({ filters }) => {
             });
 
             autoTable(doc, {
-                head: [tableColumn, subHeader],
+                head: headers,
                 body: body,
                 startY: currentY,
                 theme: 'grid',
@@ -584,7 +637,34 @@ const AnalysisReport = ({ filters }) => {
                 tableWidth: 'auto',
                 rowPageBreak: 'avoid',
                 didParseCell: (data) => {
-                    if (data.section === 'body') {
+                    if (data.section === 'head') {
+                        const isSyllabusRow = hasSyllabus && data.row.index === 0;
+                        const isTableHeaderRow = (hasSyllabus && data.row.index === 1) || (!hasSyllabus && data.row.index === 0);
+                        
+                        if (isSyllabusRow) {
+                            // Syllabus header row formatting
+                            data.cell.styles.fillColor = [255, 255, 255]; // White background
+                            data.cell.styles.textColor = [204, 51, 0];     // Red text for syllabus description
+                            data.cell.styles.fontStyle = 'bold';
+                            data.cell.styles.fontSize = 5.5;
+                            data.cell.styles.cellPadding = 0.8;
+                            
+                            // Find if this column starts a span group
+                            const found = syllabusColSpans.find(cs => cs.index === data.column.index);
+                            if (found) {
+                                data.cell.colSpan = found.span;
+                                if (syllabusRow[data.column.index] !== '') {
+                                    data.cell.styles.halign = 'left';
+                                }
+                            }
+                        } else if (isTableHeaderRow) {
+                            const colField = visibleColumns[data.column.index].field;
+                            // Check if this column should be vertically merged (rowSpan = 2)
+                            if (!['TOT', 'MAT', 'PHY', 'CHE'].includes(colField)) {
+                                data.cell.rowSpan = 2;
+                            }
+                        }
+                    } else if (data.section === 'body') {
                         const isTotalRow = (totals && data.row.index === body.length - 1);
                         if (isTotalRow) {
                             data.cell.styles.fontStyle = 'bold';
