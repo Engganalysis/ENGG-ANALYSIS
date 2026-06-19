@@ -528,12 +528,30 @@ const AnalysisReport = ({ filters }) => {
             }
 
             // Dynamically assign cell widths to fit landscape page nicely
+            const usableWidth = 281; // 297mm - 16mm margins (8mm each side)
+            let totalWeight = 0;
+            visibleColumns.forEach(col => {
+                if (col.field === 'STUD_ID') totalWeight += 20;
+                else if (col.field === 'NAME') totalWeight += 48;
+                else if (col.field === 'CAMPUS') totalWeight += 45;
+                else totalWeight += 14;
+            });
+
             const columnStyles = {};
             visibleColumns.forEach((col, idx) => {
-                if (col.field === 'STUD_ID') columnStyles[idx] = { cellWidth: 15 };
-                else if (col.field === 'NAME') columnStyles[idx] = { halign: 'left', cellWidth: 35 };
-                else if (col.field === 'CAMPUS') columnStyles[idx] = { halign: 'left', cellWidth: 32 };
-                else columnStyles[idx] = { cellWidth: 10 };
+                let weight = 14;
+                let halign = 'center';
+                if (col.field === 'STUD_ID') {
+                    weight = 20;
+                } else if (col.field === 'NAME') {
+                    weight = 48;
+                    halign = 'left';
+                } else if (col.field === 'CAMPUS') {
+                    weight = 45;
+                    halign = 'left';
+                }
+                const cellWidth = (weight / totalWeight) * usableWidth;
+                columnStyles[idx] = { halign, cellWidth };
             });
 
             autoTable(doc, {
@@ -543,7 +561,7 @@ const AnalysisReport = ({ filters }) => {
                 theme: 'grid',
                 styles: {
                     fontSize: 7,
-                    cellPadding: 0.5,
+                    cellPadding: 1.2,
                     halign: 'center',
                     valign: 'middle',
                     lineColor: [179, 232, 235], // Template border: #B3E8EB
@@ -559,7 +577,7 @@ const AnalysisReport = ({ filters }) => {
                     lineWidth: 0.1,
                     lineColor: [179, 232, 235],
                     fontSize: 7,
-                    cellPadding: 0.6
+                    cellPadding: 1.2
                 },
                 columnStyles: columnStyles,
                 margin: { left: 8, right: 8, top: 10, bottom: 10 },
@@ -589,6 +607,11 @@ const AnalysisReport = ({ filters }) => {
                             else if (['AIR_RANK', 'MAT_RANK', 'PHY_RANK', 'CHE_RANK'].includes(colField)) {
                                 data.cell.styles.textColor = [204, 51, 0]; // #CC3300
                                 data.cell.styles.fontStyle = 'bold';
+                            }
+                            // Percentage columns: bold text
+                            else if (['TOT_PER', 'MAT_PER', 'PHY_PER', 'CHE_PER'].includes(colField)) {
+                                data.cell.styles.fontStyle = 'bold';
+                                data.cell.styles.textColor = [0, 0, 0]; // Black
                             }
                         }
                     }
