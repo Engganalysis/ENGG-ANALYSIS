@@ -342,7 +342,7 @@ const AnalysisReport = ({ filters }) => {
             doc.setFont("helvetica", "bold");
             doc.setFontSize(13);
             doc.setTextColor(255, 255, 255); // White
-            const headingText = currentHeading || "ALL INDIA MARKS ANALYSIS";
+            const headingText = "ALL INDIA MARKS ANALYSIS";
             doc.text(headingText.toUpperCase(), pageWidth / 2, currentY + 6, { align: 'center' });
             currentY += row4Height + 5;
 
@@ -472,52 +472,9 @@ const AnalysisReport = ({ filters }) => {
                 visibleColumns.push(...fallbackColumns);
             }
 
-            // Build dynamic headers (Row 7, Row 8 & Row 9)
-            const syllabusRow = [];
-            const tableColumn = [];
-            const subHeader = [];
-
-            visibleColumns.forEach(col => {
-                const cell7 = worksheet ? worksheet.getCell(`${col.colLetter}7`) : null;
-                let val7 = getCellValueAsString(cell7).trim().replace(/\r?\n/g, ' ').replace(/\s+/g, ' ');
-                if (val7.startsWith("Test Name:")) {
-                    val7 = '';
-                }
-                syllabusRow.push(val7);
-                tableColumn.push(col.val8);
-                subHeader.push(col.val9);
-            });
-
-            const hasSyllabus = syllabusRow.some(val => val !== '');
-            const headers = [];
-            const syllabusColSpans = [];
-
-            if (hasSyllabus) {
-                headers.push(syllabusRow);
-                
-                // Calculate colSpans for syllabus row
-                let i = 0;
-                while (i < syllabusRow.length) {
-                    const val = syllabusRow[i];
-                    if (val === '') {
-                        let span = 1;
-                        while (i + span < syllabusRow.length && syllabusRow[i + span] === '') {
-                            span++;
-                        }
-                        syllabusColSpans.push({ index: i, span });
-                        i += span;
-                    } else {
-                        let span = 1;
-                        while (i + span < syllabusRow.length && syllabusRow[i + span] === val) {
-                            span++;
-                        }
-                        syllabusColSpans.push({ index: i, span });
-                        i += span;
-                    }
-                }
-            }
-            headers.push(tableColumn);
-            headers.push(subHeader);
+            // Build dynamic headers (Row 8 & Row 9)
+            const tableColumn = visibleColumns.map(col => col.val8);
+            const subHeader = visibleColumns.map(col => col.val9);
 
             const getStudentFieldValue = (student, field) => {
                 switch (field) {
@@ -608,7 +565,7 @@ const AnalysisReport = ({ filters }) => {
             });
 
             autoTable(doc, {
-                head: headers,
+                head: [tableColumn, subHeader],
                 body: body,
                 startY: currentY,
                 theme: 'grid',
@@ -638,26 +595,7 @@ const AnalysisReport = ({ filters }) => {
                 rowPageBreak: 'avoid',
                 didParseCell: (data) => {
                     if (data.section === 'head') {
-                        const isSyllabusRow = hasSyllabus && data.row.index === 0;
-                        const isTableHeaderRow = (hasSyllabus && data.row.index === 1) || (!hasSyllabus && data.row.index === 0);
-                        
-                        if (isSyllabusRow) {
-                            // Syllabus header row formatting
-                            data.cell.styles.fillColor = [255, 255, 255]; // White background
-                            data.cell.styles.textColor = [204, 51, 0];     // Red text for syllabus description
-                            data.cell.styles.fontStyle = 'bold';
-                            data.cell.styles.fontSize = 5.5;
-                            data.cell.styles.cellPadding = 0.8;
-                            
-                            // Find if this column starts a span group
-                            const found = syllabusColSpans.find(cs => cs.index === data.column.index);
-                            if (found) {
-                                data.cell.colSpan = found.span;
-                                if (syllabusRow[data.column.index] !== '') {
-                                    data.cell.styles.halign = 'left';
-                                }
-                            }
-                        } else if (isTableHeaderRow) {
+                        if (data.row.index === 0) {
                             const colField = visibleColumns[data.column.index].field;
                             // Check if this column should be vertically merged (rowSpan = 2)
                             if (!['TOT', 'MAT', 'PHY', 'CHE'].includes(colField)) {
