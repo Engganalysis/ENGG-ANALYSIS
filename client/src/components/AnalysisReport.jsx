@@ -80,12 +80,16 @@ const AnalysisReport = ({ filters }) => {
         const sum = (field) => studentMarks.reduce((acc, curr) => acc + (Number(curr[field]) || 0), 0);
         return {
             tot: Math.round(sum('tot') / count),
+            tot_per: Math.round(sum('tot_per') / count),
             air: Math.round(sum('air') / count),
             mat: Math.round(sum('mat') / count),
+            mat_per: Math.round(sum('mat_per') / count),
             m_rank: Math.round(sum('m_rank') / count),
             phy: Math.round(sum('phy') / count),
+            phy_per: Math.round(sum('phy_per') / count),
             p_rank: Math.round(sum('p_rank') / count),
             che: Math.round(sum('che') / count),
+            che_per: Math.round(sum('che_per') / count),
             c_rank: Math.round(sum('c_rank') / count),
         };
     };
@@ -217,7 +221,6 @@ const AnalysisReport = ({ filters }) => {
             img.onerror = () => resolve(null);
         });
     };
-
     const downloadPDF = async () => {
         try {
             const doc = new jsPDF('l', 'mm', 'a4'); // Landscape
@@ -349,9 +352,7 @@ const AnalysisReport = ({ filters }) => {
             const testName = examStats.length > 0 ? examStats[0].Test : 'GRAND TEST';
             const progName = studentMarks[0]?.batch || stream;
 
-            const headingName = currentHeading || "All India Marks Analysis";
-            const cleanHeading = headingName.replace(/[^a-zA-Z0-9\- _]/g, '').trim();
-            const fullPattern = `${testDate}_${stream}_${testName}_${cleanHeading}`;
+            const fullPattern = `${testDate}_${stream}_${testName}_All India Marks Analysis`;
 
             doc.setFont("helvetica", "bold");
             doc.setFontSize(10);
@@ -365,7 +366,6 @@ const AnalysisReport = ({ filters }) => {
             currentY += 8;
 
             // 6. Inspect columns in the template sheet to determine visibility and headers
-            const visibleColumns = [];
             const getCellValueAsString = (cell) => {
                 if (!cell || cell.value === null || cell.value === undefined) return '';
                 if (typeof cell.value === 'object' && cell.value.richText) {
@@ -374,111 +374,155 @@ const AnalysisReport = ({ filters }) => {
                 return String(cell.value);
             };
 
+            const visibleColumns = [];
+            let lastMarksCol = '';
+            
             if (worksheet) {
                 for (let i = 1; i <= 20; i++) {
-                    const column = worksheet.getColumn(i);
-                    if (!column.hidden) {
-                        visibleColumns.push({
-                            index: i,
-                            colLetter: String.fromCharCode(64 + i),
-                            width: column.width || 10
-                        });
+                    const colLetter = String.fromCharCode(64 + i);
+                    const cell8 = worksheet.getCell(`${colLetter}8`);
+                    const cell9 = worksheet.getCell(`${colLetter}9`);
+                    const val8 = getCellValueAsString(cell8).trim().replace(/\r?\n/g, ' ').replace(/\s+/g, ' ');
+                    const val9 = getCellValueAsString(cell9).trim().replace(/\r?\n/g, ' ').replace(/\s+/g, ' ');
+                    
+                    if (!val8 && !val9) continue;
+                    
+                    let field = '';
+                    const upper8 = val8.toUpperCase();
+                    if (upper8 === 'STUD_ID') {
+                        field = 'STUD_ID';
+                    } else if (upper8 === 'NAME OF THE STUDENT' || upper8 === 'NAME') {
+                        field = 'NAME';
+                    } else if (upper8 === 'SEC') {
+                        field = 'SEC';
+                    } else if (upper8 === 'TEST_MODE') {
+                        field = 'TEST_MODE';
+                    } else if (upper8 === 'CAMPUS NAME' || upper8 === 'CAMPUS') {
+                        field = 'CAMPUS';
+                    } else if (upper8 === 'TOT') {
+                        field = 'TOT';
+                        lastMarksCol = 'TOT';
+                    } else if (upper8 === 'MAT') {
+                        field = 'MAT';
+                        lastMarksCol = 'MAT';
+                    } else if (upper8 === 'PHY') {
+                        field = 'PHY';
+                        lastMarksCol = 'PHY';
+                    } else if (upper8 === 'CHE') {
+                        field = 'CHE';
+                        lastMarksCol = 'CHE';
+                    } else if (upper8 === '%') {
+                        if (lastMarksCol === 'TOT') field = 'TOT_PER';
+                        else if (lastMarksCol === 'MAT') field = 'MAT_PER';
+                        else if (lastMarksCol === 'PHY') field = 'PHY_PER';
+                        else if (lastMarksCol === 'CHE') field = 'CHE_PER';
+                    } else if (upper8.includes('AIR') && upper8.includes('RANK')) {
+                        field = 'AIR_RANK';
+                    } else if (upper8.includes('MAT') && upper8.includes('RANK')) {
+                        field = 'MAT_RANK';
+                    } else if (upper8.includes('PHY') && upper8.includes('RANK')) {
+                        field = 'PHY_RANK';
+                    } else if (upper8.includes('CHE') && upper8.includes('RANK')) {
+                        field = 'CHE_RANK';
+                    } else if (upper8.includes('STATE') && upper8.includes('RANK')) {
+                        field = 'STATE_RANK';
+                    } else if (upper8.includes('CAMP') && upper8.includes('RANK')) {
+                        field = 'CAMP_RANK';
+                    } else if (upper8.includes('SEC') && upper8.includes('RANK')) {
+                        field = 'SEC_RANK';
                     }
+                    
+                    visibleColumns.push({
+                        colNumber: i,
+                        colLetter,
+                        val8,
+                        val9,
+                        field
+                    });
                 }
             } else {
-                // Fallback if template worksheet fails to load: visible columns are all except hidden ones (C, I, J, K)
+                // Fallback visible columns list
                 const fallbackColumns = [
-                    { index: 1, colLetter: 'A', width: 15 },
-                    { index: 2, colLetter: 'B', width: 35 },
-                    { index: 5, colLetter: 'E', width: 30 },
-                    { index: 6, colLetter: 'F', width: 10 },
-                    { index: 7, colLetter: 'G', width: 10 },
-                    { index: 8, colLetter: 'H', width: 10 },
-                    { index: 12, colLetter: 'L', width: 10 },
-                    { index: 13, colLetter: 'M', width: 10 },
-                    { index: 14, colLetter: 'N', width: 10 },
-                    { index: 15, colLetter: 'O', width: 10 },
-                    { index: 16, colLetter: 'P', width: 10 },
-                    { index: 17, colLetter: 'Q', width: 10 },
-                    { index: 18, colLetter: 'R', width: 10 },
-                    { index: 19, colLetter: 'S', width: 10 },
-                    { index: 20, colLetter: 'T', width: 10 }
+                    { colNumber: 1, colLetter: 'A', val8: "STUD_ID", val9: "STUD_ID", field: 'STUD_ID' },
+                    { colNumber: 2, colLetter: 'B', val8: "NAME OF THE STUDENT", val9: "NAME OF THE STUDENT", field: 'NAME' },
+                    { colNumber: 3, colLetter: 'C', val8: "CAMPUS NAME", val9: "CAMPUS NAME", field: 'CAMPUS' },
+                    { colNumber: 4, colLetter: 'D', val8: "TOT", val9: "300", field: 'TOT' },
+                    { colNumber: 5, colLetter: 'E', val8: "%", val9: "%", field: 'TOT_PER' },
+                    { colNumber: 6, colLetter: 'F', val8: "AIR RANK", val9: "AIR RANK", field: 'AIR_RANK' },
+                    { colNumber: 7, colLetter: 'G', val8: "MAT", val9: "100", field: 'MAT' },
+                    { colNumber: 8, colLetter: 'H', val8: "MAT RANK", val9: "MAT RANK", field: 'MAT_RANK' },
+                    { colNumber: 9, colLetter: 'I', val8: "%", val9: "%", field: 'MAT_PER' },
+                    { colNumber: 10, colLetter: 'J', val8: "PHY", val9: "100", field: 'PHY' },
+                    { colNumber: 11, colLetter: 'K', val8: "PHY RANK", val9: "PHY RANK", field: 'PHY_RANK' },
+                    { colNumber: 12, colLetter: 'L', val8: "%", val9: "%", field: 'PHY_PER' },
+                    { colNumber: 13, colLetter: 'M', val8: "CHE", val9: "100", field: 'CHE' },
+                    { colNumber: 14, colLetter: 'N', val8: "CHE RANK", val9: "CHE RANK", field: 'CHE_RANK' },
+                    { colNumber: 15, colLetter: 'O', val8: "%", val9: "%", field: 'CHE_PER' }
                 ];
                 visibleColumns.push(...fallbackColumns);
             }
 
             // Build dynamic headers (Row 8 & Row 9)
-            const tableColumn = [];
-            const subHeader = [];
-            
-            visibleColumns.forEach(col => {
-                if (worksheet) {
-                    const cell8 = worksheet.getCell(`${col.colLetter}8`);
-                    const cell9 = worksheet.getCell(`${col.colLetter}9`);
-                    tableColumn.push(getCellValueAsString(cell8));
-                    subHeader.push(getCellValueAsString(cell9));
-                } else {
-                    // Fallback headers
-                    const defaultHeaders8 = {
-                        A: "STUD_ID", B: "NAME OF THE STUDENT", E: "CAMPUS NAME",
-                        F: "TOT", G: "%", H: "AIR RANK", L: "MAT", M: "MAT RANK",
-                        N: "%", O: "PHY", P: "PHY RANK", Q: "%", R: "CHE", S: "CHE RANK", T: "%"
-                    };
-                    const defaultHeaders9 = {
-                        F: "300", L: "100", O: "100", R: "100"
-                    };
-                    tableColumn.push(defaultHeaders8[col.colLetter] || '');
-                    subHeader.push(defaultHeaders9[col.colLetter] || '');
+            const tableColumn = visibleColumns.map(col => col.val8);
+            const subHeader = visibleColumns.map(col => col.val9);
+
+            const getStudentFieldValue = (student, field) => {
+                switch (field) {
+                    case 'STUD_ID': return student.STUD_ID || '';
+                    case 'NAME': return (student.name || '').toUpperCase();
+                    case 'SEC': return student.sec || '';
+                    case 'TEST_MODE': return student.test_mode || '';
+                    case 'CAMPUS': return (student.campus || '').toUpperCase();
+                    case 'TOT': return Math.round(student.tot || 0);
+                    case 'TOT_PER': return student.tot_per !== undefined && student.tot_per !== null ? Number(student.tot_per).toFixed(1) : (student.max_tot ? ((student.tot / student.max_tot) * 100).toFixed(1) : '0.0');
+                    case 'AIR_RANK': return Math.round(student.air) || '-';
+                    case 'STATE_RANK': return student.state_rank || '';
+                    case 'CAMP_RANK': return student.camp_rank || '';
+                    case 'SEC_RANK': return student.sec_rank || '';
+                    case 'MAT': return Math.round(student.mat || 0);
+                    case 'MAT_RANK': return Math.round(student.m_rank || 0);
+                    case 'MAT_PER': return student.mat_per !== undefined && student.mat_per !== null ? Number(student.mat_per).toFixed(1) : (student.max_mat ? ((student.mat / student.max_mat) * 100).toFixed(1) : '0.0');
+                    case 'PHY': return Math.round(student.phy || 0);
+                    case 'PHY_RANK': return Math.round(student.p_rank || 0);
+                    case 'PHY_PER': return student.phy_per !== undefined && student.phy_per !== null ? Number(student.phy_per).toFixed(1) : (student.max_phy ? ((student.phy / student.max_phy) * 100).toFixed(1) : '0.0');
+                    case 'CHE': return Math.round(student.che || 0);
+                    case 'CHE_RANK': return Math.round(student.c_rank || 0);
+                    case 'CHE_PER': return student.che_per !== undefined && student.che_per !== null ? Number(student.che_per).toFixed(1) : (student.max_che ? ((student.che / student.max_che) * 100).toFixed(1) : '0.0');
+                    default: return '';
                 }
-            });
+            };
+
+            const getTotalsFieldValue = (totalsVal, field) => {
+                switch (field) {
+                    case 'TOT': return Number(totalsVal.tot || 0).toFixed(1);
+                    case 'TOT_PER': return totalsVal.tot_per !== undefined && totalsVal.tot_per !== null ? Number(totalsVal.tot_per).toFixed(1) : '';
+                    case 'AIR_RANK': return Math.round(totalsVal.air) || '-';
+                    case 'MAT': return Number(totalsVal.mat || 0).toFixed(1);
+                    case 'MAT_RANK': return Number(totalsVal.m_rank || 0).toFixed(1);
+                    case 'MAT_PER': return totalsVal.mat_per !== undefined && totalsVal.mat_per !== null ? Number(totalsVal.mat_per).toFixed(1) : '';
+                    case 'PHY': return Number(totalsVal.phy || 0).toFixed(1);
+                    case 'PHY_RANK': return Number(totalsVal.p_rank || 0).toFixed(1);
+                    case 'PHY_PER': return totalsVal.phy_per !== undefined && totalsVal.phy_per !== null ? Number(totalsVal.phy_per).toFixed(1) : '';
+                    case 'CHE': return Number(totalsVal.che || 0).toFixed(1);
+                    case 'CHE_RANK': return Number(totalsVal.c_rank || 0).toFixed(1);
+                    case 'CHE_PER': return totalsVal.che_per !== undefined && totalsVal.che_per !== null ? Number(totalsVal.che_per).toFixed(1) : '';
+                    default: return '';
+                }
+            };
 
             // Map Student Body Data Rows
             const body = studentMarks.map(row => {
-                return visibleColumns.map(col => {
-                    switch (col.colLetter) {
-                        case 'A': return row.STUD_ID || '';
-                        case 'B': return (row.name || '').toUpperCase();
-                        case 'C': return row.sec || '';
-                        case 'D': return row.test_mode || '';
-                        case 'E': return (row.campus || '').toUpperCase();
-                        case 'F': return Math.round(row.tot || 0);
-                        case 'G': return row.max_tot ? ((row.tot / row.max_tot) * 100).toFixed(1) : '0.0';
-                        case 'H': return Math.round(row.air) || '-';
-                        case 'I': return row.state_rank || '';
-                        case 'J': return row.camp_rank || '';
-                        case 'K': return row.sec_rank || '';
-                        case 'L': return Math.round(row.mat || 0);
-                        case 'M': return Math.round(row.m_rank || 0);
-                        case 'N': return row.max_mat ? ((row.mat / row.max_mat) * 100).toFixed(1) : '0.0';
-                        case 'O': return Math.round(row.phy || 0);
-                        case 'P': return Math.round(row.p_rank || 0);
-                        case 'Q': return row.max_phy ? ((row.phy / row.max_phy) * 100).toFixed(1) : '0.0';
-                        case 'R': return Math.round(row.che || 0);
-                        case 'S': return Math.round(row.c_rank || 0);
-                        case 'T': return row.max_che ? ((row.che / row.max_che) * 100).toFixed(1) : '0.0';
-                        default: return '';
-                    }
-                });
+                return visibleColumns.map(col => getStudentFieldValue(row, col.field));
             });
 
             if (totals) {
                 const totalRowData = visibleColumns.map((col, colIdx) => {
                     if (colIdx === 0) return 'Campus Selection Average';
                     
-                    const fColIdx = visibleColumns.findIndex(c => c.colLetter === 'F');
+                    const fColIdx = visibleColumns.findIndex(c => c.field === 'TOT');
                     if (colIdx < fColIdx) return ''; // Empty cells for merge
                     
-                    switch (col.colLetter) {
-                        case 'F': return Number(totals.tot || 0).toFixed(1);
-                        case 'H': return Math.round(totals.air) || '-';
-                        case 'L': return Number(totals.mat || 0).toFixed(1);
-                        case 'M': return Number(totals.m_rank || 0).toFixed(1);
-                        case 'O': return Number(totals.phy || 0).toFixed(1);
-                        case 'P': return Number(totals.p_rank || 0).toFixed(1);
-                        case 'R': return Number(totals.che || 0).toFixed(1);
-                        case 'S': return Number(totals.c_rank || 0).toFixed(1);
-                        default: return '';
-                    }
+                    return getTotalsFieldValue(totals, col.field);
                 });
                 body.push(totalRowData);
             }
@@ -486,9 +530,9 @@ const AnalysisReport = ({ filters }) => {
             // Dynamically assign cell widths to fit landscape page nicely
             const columnStyles = {};
             visibleColumns.forEach((col, idx) => {
-                if (col.colLetter === 'A') columnStyles[idx] = { cellWidth: 15 };
-                else if (col.colLetter === 'B') columnStyles[idx] = { halign: 'left', cellWidth: 35 };
-                else if (col.colLetter === 'E') columnStyles[idx] = { halign: 'left', cellWidth: 32 };
+                if (col.field === 'STUD_ID') columnStyles[idx] = { cellWidth: 15 };
+                else if (col.field === 'NAME') columnStyles[idx] = { halign: 'left', cellWidth: 35 };
+                else if (col.field === 'CAMPUS') columnStyles[idx] = { halign: 'left', cellWidth: 32 };
                 else columnStyles[idx] = { cellWidth: 10 };
             });
 
@@ -528,21 +572,21 @@ const AnalysisReport = ({ filters }) => {
                             data.cell.styles.fontStyle = 'bold';
                             data.cell.styles.fillColor = [235, 241, 245];
                             if (data.column.index === 0) {
-                                const fColIdx = visibleColumns.findIndex(c => c.colLetter === 'F');
+                                const fColIdx = visibleColumns.findIndex(c => c.field === 'TOT');
                                 if (fColIdx > 1) {
                                     data.cell.colSpan = fColIdx;
                                 }
                             }
                         } else {
-                            const colLetter = visibleColumns[data.column.index].colLetter;
+                            const colField = visibleColumns[data.column.index].field;
                             // Marks columns: blue text & light purple/gray fill from template
-                            if (['F', 'L', 'O', 'R'].includes(colLetter)) {
+                            if (['TOT', 'MAT', 'PHY', 'CHE'].includes(colField)) {
                                 data.cell.styles.textColor = [0, 51, 204]; // #0033CC
                                 data.cell.styles.fillColor = [238, 230, 236]; // #EEE6EC
                                 data.cell.styles.fontStyle = 'bold';
                             }
                             // Rank columns: red text
-                            else if (['H', 'M', 'P', 'S'].includes(colLetter)) {
+                            else if (['AIR_RANK', 'MAT_RANK', 'PHY_RANK', 'CHE_RANK'].includes(colField)) {
                                 data.cell.styles.textColor = [204, 51, 0]; // #CC3300
                                 data.cell.styles.fontStyle = 'bold';
                             }
@@ -582,9 +626,7 @@ const AnalysisReport = ({ filters }) => {
             const testDate = examStats.length > 0 ? formatDate(examStats[0].DATE) : formatDate(new Date());
             const stream = (filters.stream && filters.stream.length > 0) ? filters.stream.join(',') : 'SR_ELITE';
             const testName = examStats.length > 0 ? examStats[0].Test : 'GRAND TEST';
-            const headingName = currentHeading || "All India Marks Analysis";
-            const cleanHeading = headingName.replace(/[^a-zA-Z0-9\- _]/g, '').trim();
-            const fullPattern = `${testDate}_${stream}_${testName}_${cleanHeading}`;
+            const fullPattern = `${testDate}_${stream}_${testName}_All India Marks Analysis`;
             const progName = studentMarks[0]?.batch || stream;
 
             // Update Metadata Rows 5, 6, 7
@@ -607,49 +649,142 @@ const AnalysisReport = ({ filters }) => {
             const row10Height = row10.height;
             const row11Height = row11.height;
 
-            // Clear empty template rows from 10 to end
-            const originalRowCount = worksheet.rowCount;
-            if (originalRowCount >= 10) {
-                worksheet.spliceRows(10, originalRowCount - 9);
+            // Inspect columns in the template sheet to determine visible columns
+            const getCellValueAsString = (cell) => {
+                if (!cell || cell.value === null || cell.value === undefined) return '';
+                if (typeof cell.value === 'object' && cell.value.richText) {
+                    return cell.value.richText.map(rt => rt.text || '').join('');
+                }
+                return String(cell.value);
+            };
+
+            const visibleColumns = [];
+            let lastMarksCol = '';
+            for (let i = 1; i <= 20; i++) {
+                const colLetter = String.fromCharCode(64 + i);
+                const cell8 = worksheet.getCell(`${colLetter}8`);
+                const cell9 = worksheet.getCell(`${colLetter}9`);
+                const val8 = getCellValueAsString(cell8).trim().replace(/\r?\n/g, ' ').replace(/\s+/g, ' ');
+                const val9 = getCellValueAsString(cell9).trim().replace(/\r?\n/g, ' ').replace(/\s+/g, ' ');
+                
+                if (!val8 && !val9) continue;
+                
+                let field = '';
+                const upper8 = val8.toUpperCase();
+                if (upper8 === 'STUD_ID') {
+                    field = 'STUD_ID';
+                } else if (upper8 === 'NAME OF THE STUDENT' || upper8 === 'NAME') {
+                    field = 'NAME';
+                } else if (upper8 === 'SEC') {
+                    field = 'SEC';
+                } else if (upper8 === 'TEST_MODE') {
+                    field = 'TEST_MODE';
+                } else if (upper8 === 'CAMPUS NAME' || upper8 === 'CAMPUS') {
+                    field = 'CAMPUS';
+                } else if (upper8 === 'TOT') {
+                    field = 'TOT';
+                    lastMarksCol = 'TOT';
+                } else if (upper8 === 'MAT') {
+                    field = 'MAT';
+                    lastMarksCol = 'MAT';
+                } else if (upper8 === 'PHY') {
+                    field = 'PHY';
+                    lastMarksCol = 'PHY';
+                } else if (upper8 === 'CHE') {
+                    field = 'CHE';
+                    lastMarksCol = 'CHE';
+                } else if (upper8 === '%') {
+                    if (lastMarksCol === 'TOT') field = 'TOT_PER';
+                    else if (lastMarksCol === 'MAT') field = 'MAT_PER';
+                    else if (lastMarksCol === 'PHY') field = 'PHY_PER';
+                    else if (lastMarksCol === 'CHE') field = 'CHE_PER';
+                } else if (upper8.includes('AIR') && upper8.includes('RANK')) {
+                    field = 'AIR_RANK';
+                } else if (upper8.includes('MAT') && upper8.includes('RANK')) {
+                    field = 'MAT_RANK';
+                } else if (upper8.includes('PHY') && upper8.includes('RANK')) {
+                    field = 'PHY_RANK';
+                } else if (upper8.includes('CHE') && upper8.includes('RANK')) {
+                    field = 'CHE_RANK';
+                } else if (upper8.includes('STATE') && upper8.includes('RANK')) {
+                    field = 'STATE_RANK';
+                } else if (upper8.includes('CAMP') && upper8.includes('RANK')) {
+                    field = 'CAMP_RANK';
+                } else if (upper8.includes('SEC') && upper8.includes('RANK')) {
+                    field = 'SEC_RANK';
+                }
+                
+                visibleColumns.push({
+                    colNumber: i,
+                    colLetter,
+                    field
+                });
             }
+
+            const getStudentFieldValue = (student, field) => {
+                switch (field) {
+                    case 'STUD_ID': return student.STUD_ID || '';
+                    case 'NAME': return (student.name || '').toUpperCase();
+                    case 'SEC': return student.sec || '';
+                    case 'TEST_MODE': return student.test_mode || '';
+                    case 'CAMPUS': return (student.campus || '').toUpperCase();
+                    case 'TOT': return Math.round(student.tot || 0);
+                    case 'TOT_PER': return student.tot_per !== undefined && student.tot_per !== null ? Number(student.tot_per).toFixed(1) : (student.max_tot ? Number((student.tot / student.max_tot) * 100).toFixed(1) : '0.0');
+                    case 'AIR_RANK': return Math.round(student.air) || '-';
+                    case 'STATE_RANK': return student.state_rank || '';
+                    case 'CAMP_RANK': return student.camp_rank || '';
+                    case 'SEC_RANK': return student.sec_rank || '';
+                    case 'MAT': return Math.round(student.mat || 0);
+                    case 'MAT_RANK': return Math.round(student.m_rank || 0);
+                    case 'MAT_PER': return student.mat_per !== undefined && student.mat_per !== null ? Number(student.mat_per).toFixed(1) : (student.max_mat ? Number((student.mat / student.max_mat) * 100).toFixed(1) : '0.0');
+                    case 'PHY': return Math.round(student.phy || 0);
+                    case 'PHY_RANK': return Math.round(student.p_rank || 0);
+                    case 'PHY_PER': return student.phy_per !== undefined && student.phy_per !== null ? Number(student.phy_per).toFixed(1) : (student.max_phy ? Number((student.phy / student.max_phy) * 100).toFixed(1) : '0.0');
+                    case 'CHE': return Math.round(student.che || 0);
+                    case 'CHE_RANK': return Math.round(student.c_rank || 0);
+                    case 'CHE_PER': return student.che_per !== undefined && student.che_per !== null ? Number(student.che_per).toFixed(1) : (student.max_che ? Number((student.che / student.max_che) * 100).toFixed(1) : '0.0');
+                    default: return '';
+                }
+            };
+
+            const getTotalsFieldValue = (totalsVal, field) => {
+                switch (field) {
+                    case 'TOT': return Number(totalsVal.tot || 0).toFixed(1);
+                    case 'TOT_PER': return totalsVal.tot_per !== undefined && totalsVal.tot_per !== null ? Number(totalsVal.tot_per).toFixed(1) : '';
+                    case 'AIR_RANK': return Math.round(totalsVal.air) || '-';
+                    case 'MAT': return Number(totalsVal.mat || 0).toFixed(1);
+                    case 'MAT_RANK': return Number(totalsVal.m_rank || 0).toFixed(1);
+                    case 'MAT_PER': return totalsVal.mat_per !== undefined && totalsVal.mat_per !== null ? Number(totalsVal.mat_per).toFixed(1) : '';
+                    case 'PHY': return Number(totalsVal.phy || 0).toFixed(1);
+                    case 'PHY_RANK': return Number(totalsVal.p_rank || 0).toFixed(1);
+                    case 'PHY_PER': return totalsVal.phy_per !== undefined && totalsVal.phy_per !== null ? Number(totalsVal.phy_per).toFixed(1) : '';
+                    case 'CHE': return Number(totalsVal.che || 0).toFixed(1);
+                    case 'CHE_RANK': return Number(totalsVal.c_rank || 0).toFixed(1);
+                    case 'CHE_PER': return totalsVal.che_per !== undefined && totalsVal.che_per !== null ? Number(totalsVal.che_per).toFixed(1) : '';
+                    default: return '';
+                }
+            };
 
             // Populate Student Data Rows
             studentMarks.forEach((student, index) => {
                 const targetRowNum = 10 + index;
-                const rowData = [
-                    student.STUD_ID,
-                    (student.name || '').toUpperCase(),
-                    student.sec || '',
-                    student.test_mode || '',
-                    (student.campus || '').toUpperCase(),
-                    Math.round(student.tot || 0),
-                    student.max_tot ? Number((student.tot / student.max_tot) * 100).toFixed(1) : '0.0',
-                    Math.round(student.air) || '-',
-                    student.state_rank || '',
-                    student.camp_rank || '',
-                    student.sec_rank || '',
-                    Math.round(student.mat || 0),
-                    Math.round(student.m_rank || 0),
-                    student.max_mat ? Number((student.mat / student.max_mat) * 100).toFixed(1) : '0.0',
-                    Math.round(student.phy || 0),
-                    Math.round(student.p_rank || 0),
-                    student.max_phy ? Number((student.phy / student.max_phy) * 100).toFixed(1) : '0.0',
-                    Math.round(student.che || 0),
-                    Math.round(student.c_rank || 0),
-                    student.max_che ? Number((student.che / student.max_che) * 100).toFixed(1) : '0.0'
-                ];
-                
                 const newRow = worksheet.getRow(targetRowNum);
-                newRow.values = rowData;
+                
+                const rowValues = [];
+                visibleColumns.forEach(col => {
+                    rowValues[col.colNumber] = getStudentFieldValue(student, col.field);
+                });
+                newRow.values = rowValues;
                 
                 // Copy styles (alternating colors)
                 const isEven = (index % 2 === 0);
                 const templateStyles = isEven ? row10Styles : row11Styles;
                 newRow.height = isEven ? row10Height : row11Height;
                 
-                templateStyles.forEach((style, colNumber) => {
+                visibleColumns.forEach(col => {
+                    const style = templateStyles[col.colNumber];
                     if (style) {
-                        newRow.getCell(colNumber).style = style;
+                        newRow.getCell(col.colNumber).style = style;
                     }
                 });
             });
@@ -657,33 +792,34 @@ const AnalysisReport = ({ filters }) => {
             // Populate Totals Row at the bottom
             if (totals) {
                 const totalRowNum = 10 + studentMarks.length;
-                const totalRowData = [
-                    'Campus Selection Average', '', '', '', '',
-                    Number(totals.tot || 0).toFixed(1),
-                    '',
-                    Math.round(totals.air) || '-',
-                    '', '', '',
-                    Number(totals.mat || 0).toFixed(1),
-                    Number(totals.m_rank || 0).toFixed(1),
-                    '',
-                    Number(totals.phy || 0).toFixed(1),
-                    Number(totals.p_rank || 0).toFixed(1),
-                    '',
-                    Number(totals.che || 0).toFixed(1),
-                    Number(totals.c_rank || 0).toFixed(1),
-                    ''
-                ];
                 const totalRow = worksheet.getRow(totalRowNum);
-                totalRow.values = totalRowData;
                 
-                // Merge A to E
-                worksheet.mergeCells(`A${totalRowNum}:E${totalRowNum}`);
+                const totalRowValues = [];
+                const fColIdx = visibleColumns.findIndex(c => c.field === 'TOT');
+                const fColNum = visibleColumns[fColIdx].colNumber;
+                
+                visibleColumns.forEach((col, idx) => {
+                    if (idx === 0) {
+                        totalRowValues[col.colNumber] = 'Campus Selection Average';
+                    } else if (col.colNumber < fColNum) {
+                        totalRowValues[col.colNumber] = '';
+                    } else {
+                        totalRowValues[col.colNumber] = getTotalsFieldValue(totals, col.field);
+                    }
+                });
+                totalRow.values = totalRowValues;
+                
+                // Merge cells from first column to column just before TOT
+                const firstColLetter = visibleColumns[0].colLetter;
+                const preTotColLetter = String.fromCharCode(64 + fColNum - 1);
+                worksheet.mergeCells(`${firstColLetter}${totalRowNum}:${preTotColLetter}${totalRowNum}`);
                 
                 // Style Totals Row
                 totalRow.height = row10Height;
-                row10Styles.forEach((style, colNumber) => {
+                visibleColumns.forEach(col => {
+                    const style = row10Styles[col.colNumber];
                     if (style) {
-                        const cell = totalRow.getCell(colNumber);
+                        const cell = totalRow.getCell(col.colNumber);
                         cell.style = style;
                         cell.font = { ...style.font, bold: true };
                         // Add light tint background color for totals row
@@ -695,6 +831,25 @@ const AnalysisReport = ({ filters }) => {
                     }
                 });
             }
+
+            // Clear remaining template rows (values and styles) instead of splicing
+            const originalRowCount = worksheet.rowCount;
+            const totalRowNum = 10 + studentMarks.length + (totals ? 1 : 0);
+            if (originalRowCount > totalRowNum) {
+                for (let r = totalRowNum + 1; r <= originalRowCount; r++) {
+                    const row = worksheet.getRow(r);
+                    row.values = null;
+                    row.height = 15;
+                    row.eachCell({ includeEmpty: true }, (cell) => {
+                        cell.style = undefined;
+                    });
+                }
+            }
+
+            // Set print area dynamically to cover only the populated rows
+            const firstColLetter = visibleColumns[0].colLetter;
+            const lastColLetter = visibleColumns[visibleColumns.length - 1].colLetter;
+            worksheet.pageSetup.printArea = `${firstColLetter}1:${lastColLetter}${totalRowNum}`;
 
             // Write buffer and save
             const buffer = await workbook.xlsx.writeBuffer();
