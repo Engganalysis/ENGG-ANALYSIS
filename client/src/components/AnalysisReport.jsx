@@ -544,7 +544,7 @@ const AnalysisReport = ({ filters }) => {
                 startY: currentY,
                 theme: 'grid',
                 styles: {
-                    fontSize: 7,
+                    fontSize: 9.5,
                     cellPadding: 1.2,
                     halign: 'center',
                     valign: 'middle',
@@ -560,7 +560,7 @@ const AnalysisReport = ({ filters }) => {
                     fontStyle: 'bold',
                     lineWidth: 0.1,
                     lineColor: [179, 232, 235],
-                    fontSize: 7,
+                    fontSize: 9.5,
                     cellPadding: 1.2
                 },
                 columnStyles: columnStyles,
