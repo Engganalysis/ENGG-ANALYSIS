@@ -73,10 +73,114 @@ app.get('/api/health', async (req, res) => {
 
 
 
+function normalizeBatchName(name) {
+    if (!name) return '';
+    const clean = name.trim();
+    
+    // 1. Identify Prefix: "Jr." or "Sr."
+    let prefix = '';
+    if (/^jr/i.test(clean)) {
+        prefix = 'Jr.';
+    } else if (/^sr/i.test(clean)) {
+        prefix = 'Sr.';
+    } else {
+        if (/^junior/i.test(clean)) prefix = 'Jr.';
+        else if (/^senior/i.test(clean)) prefix = 'Sr.';
+    }
+    
+    // 2. Identify Core: "Super60" or "C-120" or others
+    let core = '';
+    if (/super[-_]?60/i.test(clean)) {
+        core = 'Super60';
+    } else if (/c[-_]?120/i.test(clean)) {
+        core = 'C-120';
+    } else {
+        let temp = clean
+            .replace(/^(jr|sr|junior|senior)\.?\s*/i, '')
+            .replace(/sterling|steling|streling/i, '')
+            .replace(/(jee\s+)?(mains?|advance?d?|adv)/i, '')
+            .replace(/[^a-zA-Z0-9-]/g, '')
+            .trim();
+        core = temp || clean;
+    }
+    
+    // 3. Identify Modifiers: S (Sterling), M (Mains), A (Advance)
+    const hasSterling = /sterling|steling|streling/i.test(clean);
+    const hasMains = /mains?/i.test(clean);
+    const hasAdvance = /adv(ance)?d?/i.test(clean);
+    
+    let suffix = '';
+    if (hasSterling && hasMains) {
+        suffix = '(SM)';
+    } else if (hasSterling && hasAdvance) {
+        suffix = '(SA)';
+    } else if (hasMains) {
+        suffix = '(M)';
+    } else if (hasAdvance) {
+        suffix = '(A)';
+    }
+    
+    if (prefix && core) {
+        return `${prefix}${core}${suffix}`;
+    }
+    return clean;
+}
+
+let allRawBatchesCache = [];
+let lastCacheUpdate = 0;
+
+async function getRawBatches(pool) {
+    const now = Date.now();
+    // Cache for 5 minutes
+    if (allRawBatchesCache.length > 0 && (now - lastCacheUpdate < 300000)) {
+        return allRawBatchesCache;
+    }
+    try {
+        const enggRes = await pool.request().query("SELECT DISTINCT Batch FROM ENGG_RESULT WHERE Batch IS NOT NULL AND Batch != ''");
+        const erpRes = await pool.request().query("SELECT DISTINCT Batch FROM ERP_REPORT_ENGG WHERE Batch IS NOT NULL AND Batch != ''");
+        
+        const set = new Set();
+        (enggRes.recordset || []).forEach(r => { if (r.Batch) set.add(r.Batch.trim()); });
+        (erpRes.recordset || []).forEach(r => { if (r.Batch) set.add(r.Batch.trim()); });
+        
+        allRawBatchesCache = Array.from(set);
+        lastCacheUpdate = now;
+        console.log(`[Cache] Updated raw batches list. Total count: ${allRawBatchesCache.length}`);
+    } catch (err) {
+        console.error("Error updating raw batches cache:", err.message);
+    }
+    return allRawBatchesCache;
+}
+
+async function resolveStreams(stream, pool) {
+    if (!stream || stream === 'All' || stream === '__ALL__') return stream;
+    const streamsArray = Array.isArray(stream) ? stream : [stream];
+    const rawBatches = await getRawBatches(pool);
+    
+    const resolved = [];
+    for (const selected of streamsArray) {
+        let matchedAny = false;
+        for (const raw of rawBatches) {
+            if (normalizeBatchName(raw).toUpperCase() === selected.toUpperCase()) {
+                resolved.push(raw);
+                matchedAny = true;
+            }
+        }
+        if (!matchedAny) {
+            resolved.push(selected);
+        }
+    }
+    return resolved;
+}
+
 // Helper to build WHERE clause
-// Helper to build WHERE clause
-const buildWhereClause = (req, options = {}) => {
-    const { campus, stream, test, testType, topAll, studentSearch, quickSearch } = req.query;
+const buildWhereClause = async (req, pool, options = {}) => {
+    let { campus, stream, test, testType, topAll, studentSearch, quickSearch } = req.query;
+
+    if (pool && !options.ignoreStream && stream && stream !== 'All' && stream !== '__ALL__') {
+        stream = await resolveStreams(stream, pool);
+    }
+
     let clauses = [];
 
     const addClause = (field, value) => {
@@ -148,6 +252,8 @@ app.get('/api/filters', async (req, res) => {
         const { campus, stream, testType, test } = req.query;
         console.log(`[Filters] Request: campus=${campus}, stream=${stream}, testType=${testType}, test=${test}`);
 
+        const resolvedStream = await resolveStreams(stream, pool);
+
         const buildOptionClause = (column, values) => {
             if (!values || values === 'All' || values === '__ALL__') return null;
             const valArray = Array.isArray(values) ? values : [values];
@@ -162,7 +268,7 @@ app.get('/api/filters', async (req, res) => {
         };
 
         const campusClause = buildOptionClause('UPPER(TRIM(CAMPUS_NAME))', campus);
-        const streamClause = buildOptionClause('UPPER(TRIM(Batch))', stream);
+        const streamClause = buildOptionClause('UPPER(TRIM(Batch))', resolvedStream);
         const testTypeClause = buildOptionClause('UPPER(TRIM(P1_P2))', testType);
         const testClause = buildOptionClause('UPPER(TRIM(Test))', test);
 
@@ -204,9 +310,12 @@ app.get('/api/filters', async (req, res) => {
             pool.request().query(topQuery)
         ]);
 
+        const rawStreams = (streamsRes.recordset || []).map(r => r.Result).filter(Boolean);
+        const normalizedStreams = Array.from(new Set(rawStreams.map(normalizeBatchName))).sort();
+
         const responseData = {
             campuses: (campusesRes.recordset || []).map(r => r.Result).filter(Boolean),
-            streams: (streamsRes.recordset || []).map(r => r.Result).filter(Boolean),
+            streams: normalizedStreams,
             testTypes: (testTypesRes.recordset || []).map(r => r.Result).filter(Boolean),
             tests: (testsRes.recordset || []).map(r => r.Result).filter(Boolean),
             topAll: (topRes.recordset || []).map(r => r.Result).filter(Boolean)
@@ -248,7 +357,7 @@ app.get('/api/students', async (req, res) => {
         const pool = await connectToDb();
         console.log("Connected. Querying ENGG_RESULT...");
 
-        const whereClause = buildWhereClause(req);
+        const whereClause = await buildWhereClause(req, pool);
         console.log(`[students] Generated WHERE clause: "${whereClause}"`);
         // We will select Top 100 to avoid overwhelming the frontend if DB is huge
         const result = await pool.request().query(`
@@ -276,7 +385,7 @@ app.get('/api/students', async (req, res) => {
 app.get('/api/top10', async (req, res) => {
     try {
         const pool = await connectToDb();
-        const whereClause = buildWhereClause(req);
+        const whereClause = await buildWhereClause(req, pool);
         console.log(`[top10] Generated WHERE clause: "${whereClause}"`);
 
         const result = await pool.request().query(`
@@ -298,7 +407,7 @@ app.get('/api/top10', async (req, res) => {
 app.get('/api/performance', async (req, res) => {
     try {
         const pool = await connectToDb();
-        const whereClause = buildWhereClause(req);
+        const whereClause = await buildWhereClause(req, pool);
         console.log(`[Performance] Generated WHERE clause: "${whereClause}"`);
 
         // Calculate Pass/Fail (Assuming 50% of 720 which is 360 is pass, or generic 50%)
@@ -348,7 +457,7 @@ app.get('/api/history', async (req, res) => {
         // If we have filters, apply them too
         // For History/Progress Report, we respect all filters 
         // but can ignore if user wants "All" - handled by buildWhereClause logic
-        const baseWhere = buildWhereClause(req, { ignoreTest: false, ignoreTestType: false });
+        const baseWhere = await buildWhereClause(req, pool, { ignoreTest: false, ignoreTestType: false });
         if (baseWhere && !whereClause) whereClause = baseWhere;
         else if (baseWhere && whereClause) whereClause += ` AND ` + baseWhere.replace('WHERE ', '');
 
@@ -391,7 +500,7 @@ app.get('/api/history', async (req, res) => {
             const batches = [...new Set(historyData.map(h => h.Batch).filter(Boolean))];
             if (batches.length > 0) {
                 const batchList = batches.map(b => `'${b.replace(/'/g, "''")}'`).join(',');
-                const bWhere = buildWhereClause(req, { ignoreStudent: true, ignoreCampus: false });
+                const bWhere = await buildWhereClause(req, pool, { ignoreStudent: true, ignoreCampus: false });
                 const finalBWhere = bWhere ? `${bWhere} AND Batch IN (${batchList})` : `WHERE Batch IN (${batchList})`;
 
                 const bQuery = `
@@ -409,9 +518,18 @@ app.get('/api/history', async (req, res) => {
             }
         }
 
+        const mappedHistory = (historyData || []).map(h => ({
+            ...h,
+            Batch: normalizeBatchName(h.Batch)
+        }));
+        const mappedBatchExams = (batchExams || []).map(b => ({
+            ...b,
+            Batch: normalizeBatchName(b.Batch)
+        }));
+
         res.json({
-            history: historyData,
-            batchExams: batchExams
+            history: mappedHistory,
+            batchExams: mappedBatchExams
         });
     } catch (err) {
         console.error(err);
@@ -425,7 +543,7 @@ app.get('/api/studentsByCampus', async (req, res) => {
         const pool = await connectToDb();
         // Allow filters to apply (especially Campus for security context)
         // If frontend sends specific filters (like restricted campus), we must respect them.
-        const where = buildWhereClause(req);
+        const where = await buildWhereClause(req, pool);
         console.log(`[studentsByCampus] Generated WHERE: "${where}"`);
         console.log(`[studentsByCampus] Global Search - Generated WHERE: "${where}"`);
 
@@ -446,7 +564,16 @@ app.get('/api/studentsByCampus', async (req, res) => {
 
         logQuery(query, req.query);
         // cache.set(cacheKey, students.recordset, 30); // Disabled for debug
-        res.json(students.recordset);
+        
+        const formattedStudents = (students.recordset || []).map(s => {
+            const rawStreams = (s.stream || '').split(',').filter(Boolean);
+            const normalized = Array.from(new Set(rawStreams.map(normalizeBatchName))).sort().join(',');
+            return {
+                ...s,
+                stream: normalized
+            };
+        });
+        res.json(formattedStudents);
     } catch (err) {
         res.status(500).send(err.message);
     }
@@ -456,7 +583,7 @@ app.get('/api/studentsByCampus', async (req, res) => {
 app.get('/api/exam-stats', async (req, res) => {
     try {
         const pool = await connectToDb();
-        const where = buildWhereClause(req);
+        const where = await buildWhereClause(req, pool);
         const query = `
             SELECT 
                 DATE(DATE) as DATE,
@@ -502,7 +629,7 @@ app.get('/api/exam-stats', async (req, res) => {
 app.get('/api/analysis-report', async (req, res) => {
     try {
         const pool = await connectToDb();
-        const where = buildWhereClause(req);
+        const where = await buildWhereClause(req, pool);
 
         // 1. Get Student Data
         const studentQuery = `
@@ -548,8 +675,13 @@ app.get('/api/analysis-report', async (req, res) => {
             pool.request().query(metaQuery)
         ]);
 
+        const formattedStudents = (studentRes.recordset || []).map(s => ({
+            ...s,
+            batch: normalizeBatchName(s.batch)
+        }));
+
         res.json({
-            students: studentRes.recordset,
+            students: formattedStudents,
             exams: metaRes.recordset,
             t_cnt: metaRes.recordset.length
         });
@@ -568,6 +700,8 @@ app.get('/api/erp/filters', async (req, res) => {
         const { campus, stream, testType, test } = req.query;
         console.log(`[ERP Filters] Request: campus=${campus}, stream=${stream}, testType=${testType}, test=${test}`);
 
+        const resolvedStream = await resolveStreams(stream, pool);
+
         const buildOptionClause = (column, values) => {
             if (!values || values === 'All' || values === '__ALL__') return null;
             const valArray = Array.isArray(values) ? values : [values];
@@ -583,7 +717,7 @@ app.get('/api/erp/filters', async (req, res) => {
 
         // Note: Frontend sends 'campus' (mapped from filters state), we query 'Branch' column
         const branchClause = buildOptionClause('UPPER(TRIM(Branch))', campus);
-        const streamClause = buildOptionClause('UPPER(TRIM(Batch))', stream);
+        const streamClause = buildOptionClause('UPPER(TRIM(Batch))', resolvedStream);
         const testTypeClause = buildOptionClause('UPPER(TRIM(Test_Type))', testType);
         const testClause = buildOptionClause('UPPER(TRIM(Test))', test);
 
@@ -618,9 +752,12 @@ app.get('/api/erp/filters', async (req, res) => {
 
         console.log(`[ERP Filters] Found Campuses: ${branchesRes.recordset.length}, Streams: ${streamsRes.recordset.length}`);
 
+        const rawStreams = (streamsRes.recordset || []).map(r => r.Result).filter(Boolean);
+        const normalizedStreams = Array.from(new Set(rawStreams.map(normalizeBatchName))).sort();
+
         res.json({
             campuses: (branchesRes.recordset || []).map(r => r.Result).filter(Boolean),
-            streams: (streamsRes.recordset || []).map(r => r.Result).filter(Boolean),
+            streams: normalizedStreams,
             testTypes: (testTypesRes.recordset || []).map(r => r.Result).filter(Boolean),
             tests: (testsRes.recordset || []).map(r => r.Result).filter(Boolean),
             topAll: (topRes.recordset || []).map(r => r.Result).filter(Boolean)
@@ -637,6 +774,8 @@ app.get('/api/erp/students', async (req, res) => {
         const pool = await connectToDb();
         const { quickSearch, campus, stream, test, testType, topAll, TOP_ALL } = req.query;
 
+        const resolvedStream = await resolveStreams(stream, pool);
+
         // Helper to add clauses
         let clauses = [];
         const addClause = (field, value) => {
@@ -649,7 +788,7 @@ app.get('/api/erp/students', async (req, res) => {
 
         // Apply Filters
         addClause('Branch', campus);
-        addClause('Batch', stream);
+        addClause('Batch', resolvedStream);
         addClause('Test', test);
         addClause('Test_Type', testType);
 
@@ -677,7 +816,11 @@ app.get('/api/erp/students', async (req, res) => {
             LIMIT 100`;
 
         const result = await pool.request().query(query);
-        res.json(result.recordset);
+        const formattedStudents = (result.recordset || []).map(s => ({
+            ...s,
+            stream: normalizeBatchName(s.stream)
+        }));
+        res.json(formattedStudents);
     } catch (err) {
         console.error("[ERP Students] ERROR:", err);
         res.status(500).send(err.message);
@@ -690,6 +833,8 @@ app.get('/api/erp/report', async (req, res) => {
         const pool = await connectToDb();
         const { campus, stream, test, testType, topAll, studentSearch, quickSearch } = req.query;
 
+        const resolvedStream = await resolveStreams(stream, pool);
+
         let clauses = [];
         const addClause = (field, value) => {
             if (!value || value === 'All' || value === '__ALL__') return;
@@ -701,7 +846,7 @@ app.get('/api/erp/report', async (req, res) => {
 
         // Map filters to ERP columns
         addClause('Branch', campus);
-        addClause('Batch', stream);
+        addClause('Batch', resolvedStream);
         addClause('Test', test);
         addClause('Test_Type', testType);
         addClause('Top_ALL', topAll);
@@ -738,7 +883,11 @@ app.get('/api/erp/report', async (req, res) => {
 
         logQuery(query, req.query);
         const result = await pool.request().query(query);
-        res.json(result.recordset);
+        const formattedReport = (result.recordset || []).map(row => ({
+            ...row,
+            Batch: normalizeBatchName(row.Batch)
+        }));
+        res.json(formattedReport);
     } catch (err) {
         console.error("[ERP Report] ERROR:", err);
         res.status(500).send(err.message);
