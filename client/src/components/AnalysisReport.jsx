@@ -792,7 +792,17 @@ const AnalysisReport = ({ filters }) => {
                 visibleColumns.forEach(col => {
                     const style = templateStyles[col.colNumber];
                     if (style) {
-                        newRow.getCell(col.colNumber).style = style;
+                        // Create a shallow copy of style to safely change the fill per row
+                        const cellStyle = { ...style };
+                        
+                        // Set alternating background fills: even rows white, odd rows soft light blue
+                        cellStyle.fill = {
+                            type: 'pattern',
+                            pattern: 'solid',
+                            fgColor: { argb: isEven ? 'FFFFFFFF' : 'FFEBF2FA' }
+                        };
+                        
+                        newRow.getCell(col.colNumber).style = cellStyle;
                     }
                 });
             });
