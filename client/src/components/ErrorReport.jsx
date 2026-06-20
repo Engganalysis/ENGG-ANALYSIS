@@ -22,7 +22,7 @@ const getSubjectOrder = (subject) => {
 };
 
 const ErrorReport = ({ filters, setFilters }) => {
-    const { userData, isAdmin, currentHeading } = useAuth();
+    const { userData, isAdmin, currentHeading, customHeading } = useAuth();
     // Use props filters
     const [subjectFilter, setSubjectFilter] = useState('ALL');
     const [showSubjects, setShowSubjects] = useState(false);
@@ -713,11 +713,11 @@ const ErrorReport = ({ filters, setFilters }) => {
 
             const fonts = { impactFont, bookmanFont, bookmanBoldFont, timesFont };
 
-            const sanitizedHeading = (currentHeading || "Error_Report").replace(/[^a-zA-Z0-9\-_ ]/g, '_').trim();
+            const fileSuffix = customHeading ? `_${customHeading.replace(/[^a-zA-Z0-9\-_ ]/g, '_').trim()}` : '';
 
             if (reportData.length === 1) {
                 const doc = await createStudentPDF(reportData[0], fonts, logoImg);
-                doc.save(`${reportData[0].info.name}_${reportData[0].info.branch}_${sanitizedHeading}.pdf`);
+                doc.save(`${reportData[0].info.name}_${reportData[0].info.branch}${fileSuffix}.pdf`);
                 logActivity(userData, 'Downloaded Error PDF', { student: reportData[0].info.name });
             } else {
                 const zip = new JSZip();
@@ -727,12 +727,12 @@ const ErrorReport = ({ filters, setFilters }) => {
                     setPdfProgress(`Generating PDF for ${student.info.name} (${i + 1}/${reportData.length})...`);
                     const doc = await createStudentPDF(student, fonts, logoImg);
                     const blob = doc.output('blob');
-                    zip.file(`${student.info.name}_${student.info.branch}_${sanitizedHeading}.pdf`, blob);
+                    zip.file(`${student.info.name}_${student.info.branch}${fileSuffix}.pdf`, blob);
                 }
 
                 setPdfProgress('Compressing...');
                 const zipContent = await zip.generateAsync({ type: 'blob' });
-                saveAs(zipContent, `Error_Reports_${subjectFilter}_${sanitizedHeading}.zip`);
+                saveAs(zipContent, `Error_Reports_${subjectFilter}${fileSuffix}.zip`);
                 logActivity(userData, 'Downloaded Bulk Error Reports', { count: reportData.length, subject: subjectFilter });
             }
 

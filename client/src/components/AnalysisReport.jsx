@@ -11,7 +11,7 @@ import { logActivity } from '../utils/activityLogger';
 
 
 const AnalysisReport = ({ filters }) => {
-    const { userData, currentHeading } = useAuth();
+    const { userData, currentHeading, customHeading } = useAuth();
     const [examStats, setExamStats] = useState([]);
     const [studentMarks, setStudentMarks] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -352,8 +352,8 @@ const AnalysisReport = ({ filters }) => {
             const testName = examStats.length > 0 ? examStats[0].Test : 'GRAND TEST';
             const progName = studentMarks[0]?.batch || stream;
 
-            const sanitizedHeading = (currentHeading || "All India Marks Analysis").replace(/[^a-zA-Z0-9\-_ ]/g, '_').trim();
-            const fullPattern = `${testDate}_${stream}_${testName}_${sanitizedHeading}`;
+            const fileSuffix = customHeading ? customHeading.replace(/[^a-zA-Z0-9\-_ ]/g, '_').trim() : "All India Marks Analysis";
+            const fullPattern = `${testDate}_${stream}_${testName}_${fileSuffix}`;
 
             const drawRichTextRow = (label, value, y) => {
                 doc.setFont("helvetica", "bold");
@@ -630,8 +630,8 @@ const AnalysisReport = ({ filters }) => {
             const testDate = examStats.length > 0 ? formatDate(examStats[0].DATE) : formatDate(new Date());
             const stream = (filters.stream && filters.stream.length > 0) ? filters.stream.join(',') : 'SR_ELITE';
             const testName = examStats.length > 0 ? examStats[0].Test : 'GRAND TEST';
-            const sanitizedHeading = (currentHeading || "All India Marks Analysis").replace(/[^a-zA-Z0-9\-_ ]/g, '_').trim();
-            const fullPattern = `${testDate}_${stream}_${testName}_${sanitizedHeading}`;
+            const fileSuffix = customHeading ? customHeading.replace(/[^a-zA-Z0-9\-_ ]/g, '_').trim() : "All India Marks Analysis";
+            const fullPattern = `${testDate}_${stream}_${testName}_${fileSuffix}`;
             const progName = studentMarks[0]?.batch || stream;
 
             // Update Metadata Rows 5, 6, 7

@@ -55,7 +55,6 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     const [customHeading, setCustomHeading] = useState('');
-    const [fileNamesHeading, setFileNamesHeading] = useState('');
 
     // Fetch custom heading from API
     useEffect(() => {
@@ -71,24 +70,6 @@ export const AuthProvider = ({ children }) => {
             }
         };
         fetchCustomHeading();
-    }, []);
-
-    // Fetch filename heading from API
-    useEffect(() => {
-        const fetchFiles = async () => {
-            try {
-                const res = await fetch(`${API_URL}/api/engg-files`);
-                if (res.ok) {
-                    const files = await res.json();
-                    if (files && files.length > 0) {
-                        setFileNamesHeading(files.join(' / '));
-                    }
-                }
-            } catch (err) {
-                console.error("Error fetching result filenames:", err);
-            }
-        };
-        fetchFiles();
     }, []);
 
     const updateCustomHeading = async (newHeading) => {
@@ -112,8 +93,7 @@ export const AuthProvider = ({ children }) => {
         isPrincipal: userData?.role === 'principal',
         isApproved: userData?.isApproved,
         customHeading,
-        fileNamesHeading,
-        currentHeading: customHeading || fileNamesHeading || "Sri Chaitanya Educational Institutions",
+        currentHeading: customHeading || "Sri Chaitanya Educational Institutions",
         updateCustomHeading
     };
 
