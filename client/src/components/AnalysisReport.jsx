@@ -652,6 +652,12 @@ const AnalysisReport = ({ filters }) => {
                 ]
             };
 
+            // Clear syllabus example cells from Row 7 (columns C onwards) to prevent displaying template leftovers
+            for (let i = 3; i <= 20; i++) {
+                const colLetter = String.fromCharCode(64 + i);
+                worksheet.getCell(`${colLetter}7`).value = null;
+            }
+
             // Save row styles from row 10 and 11
             const row10Styles = [];
             const row11Styles = [];
