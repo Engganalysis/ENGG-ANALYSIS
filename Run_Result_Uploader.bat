@@ -1,4 +1,7 @@
 @echo off
+:: Custom Heading configuration for PDFs and saved files
+set CUSTOM_HEADING=Sri Chaitanya Educational Institutions
+
 echo ========================================================
 echo   ENGINEERING RESULT EXCEL EXTRACTOR & UPLOADER
 echo ========================================================

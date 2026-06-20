@@ -48,6 +48,31 @@ async function connectToDb() {
                 })
             };
 
+            // Automatically sync custom heading if passed via environment variable in bat file
+            if (process.env.CUSTOM_HEADING) {
+                const headingVal = process.env.CUSTOM_HEADING.trim();
+                console.log(`[Custom Heading Sync] Detected: "${headingVal}". Syncing to database...`);
+                try {
+                    // Create table if not exists
+                    await poolRaw.query(`
+                        CREATE TABLE IF NOT EXISTS ENGG_SETTINGS (
+                            setting_key VARCHAR(255) PRIMARY KEY,
+                            setting_value TEXT
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+                    `);
+                    
+                    // Insert or update
+                    await poolRaw.query(`
+                        INSERT INTO ENGG_SETTINGS (setting_key, setting_value) 
+                        VALUES ('custom_heading', ?) 
+                        ON DUPLICATE KEY UPDATE setting_value = ?
+                    `, [headingVal, headingVal]);
+                    console.log("[Custom Heading Sync] Successfully synced to database!");
+                } catch (err) {
+                    console.error("[Custom Heading Sync] Failed to sync custom heading to database:", err.message);
+                }
+            }
+
         } catch (err) {
             console.error("Database Connection Failed! Config:", { ...config, password: '***' });
             console.error(err);

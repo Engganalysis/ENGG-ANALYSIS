@@ -241,7 +241,32 @@ app.get('/api/engg-files', async (req, res) => {
         res.json(files);
     } catch (err) {
         console.error("Error fetching engg files:", err);
-        res.json([]); // Return empty array on error to prevent UI break
+        res.json([]);
+    }
+});
+
+// Get Custom Heading Settings
+app.get('/api/settings/heading', async (req, res) => {
+    try {
+        const pool = await connectToDb();
+        // Ensure table exists
+        await pool.request().query(`
+            CREATE TABLE IF NOT EXISTS ENGG_SETTINGS (
+                setting_key VARCHAR(255) PRIMARY KEY,
+                setting_value TEXT
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        `);
+        const result = await pool.request().query(`
+            SELECT setting_value FROM ENGG_SETTINGS WHERE setting_key = 'custom_heading'
+        `);
+        if (result.recordset && result.recordset.length > 0) {
+            res.json({ customHeading: result.recordset[0].setting_value });
+        } else {
+            res.json({ customHeading: '' });
+        }
+    } catch (err) {
+        console.error("Error fetching custom heading:", err);
+        res.json({ customHeading: '' });
     }
 });
 

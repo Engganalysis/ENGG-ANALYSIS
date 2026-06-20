@@ -713,9 +713,11 @@ const ErrorReport = ({ filters, setFilters }) => {
 
             const fonts = { impactFont, bookmanFont, bookmanBoldFont, timesFont };
 
+            const sanitizedHeading = (currentHeading || "Error_Report").replace(/[^a-zA-Z0-9\-_ ]/g, '_').trim();
+
             if (reportData.length === 1) {
                 const doc = await createStudentPDF(reportData[0], fonts, logoImg);
-                doc.save(`${reportData[0].info.name}_${reportData[0].info.branch}.pdf`);
+                doc.save(`${reportData[0].info.name}_${reportData[0].info.branch}_${sanitizedHeading}.pdf`);
                 logActivity(userData, 'Downloaded Error PDF', { student: reportData[0].info.name });
             } else {
                 const zip = new JSZip();
@@ -725,12 +727,12 @@ const ErrorReport = ({ filters, setFilters }) => {
                     setPdfProgress(`Generating PDF for ${student.info.name} (${i + 1}/${reportData.length})...`);
                     const doc = await createStudentPDF(student, fonts, logoImg);
                     const blob = doc.output('blob');
-                    zip.file(`${student.info.name}_${student.info.branch}.pdf`, blob);
+                    zip.file(`${student.info.name}_${student.info.branch}_${sanitizedHeading}.pdf`, blob);
                 }
 
                 setPdfProgress('Compressing...');
                 const zipContent = await zip.generateAsync({ type: 'blob' });
-                saveAs(zipContent, `Error_Reports_${subjectFilter}.zip`);
+                saveAs(zipContent, `Error_Reports_${subjectFilter}_${sanitizedHeading}.zip`);
                 logActivity(userData, 'Downloaded Bulk Error Reports', { count: reportData.length, subject: subjectFilter });
             }
 

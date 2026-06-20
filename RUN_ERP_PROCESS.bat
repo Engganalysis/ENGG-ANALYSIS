@@ -2,6 +2,9 @@
 TITLE ENGG ANALYSIS - FULL REPORT GENERATION PROCESS
 COLOR 0B
 
+:: Custom Heading configuration for PDFs and saved files
+set CUSTOM_HEADING=Sri Chaitanya Educational Institutions
+
 echo ========================================================
 echo   ENGG ANALYSIS: ERP REPORT GENERATION WORKFLOW
 echo ========================================================

@@ -342,7 +342,7 @@ const AnalysisReport = ({ filters }) => {
             doc.setFont("helvetica", "bold");
             doc.setFontSize(13);
             doc.setTextColor(255, 255, 255); // White
-            const headingText = "ALL INDIA MARKS ANALYSIS";
+            const headingText = currentHeading || "ALL INDIA MARKS ANALYSIS";
             doc.text(headingText.toUpperCase(), pageWidth / 2, currentY + 6, { align: 'center' });
             currentY += row4Height + 5;
 
@@ -352,7 +352,8 @@ const AnalysisReport = ({ filters }) => {
             const testName = examStats.length > 0 ? examStats[0].Test : 'GRAND TEST';
             const progName = studentMarks[0]?.batch || stream;
 
-            const fullPattern = `${testDate}_${stream}_${testName}_All India Marks Analysis`;
+            const sanitizedHeading = (currentHeading || "All India Marks Analysis").replace(/[^a-zA-Z0-9\-_ ]/g, '_').trim();
+            const fullPattern = `${testDate}_${stream}_${testName}_${sanitizedHeading}`;
 
             const drawRichTextRow = (label, value, y) => {
                 doc.setFont("helvetica", "bold");
@@ -629,7 +630,8 @@ const AnalysisReport = ({ filters }) => {
             const testDate = examStats.length > 0 ? formatDate(examStats[0].DATE) : formatDate(new Date());
             const stream = (filters.stream && filters.stream.length > 0) ? filters.stream.join(',') : 'SR_ELITE';
             const testName = examStats.length > 0 ? examStats[0].Test : 'GRAND TEST';
-            const fullPattern = `${testDate}_${stream}_${testName}_All India Marks Analysis`;
+            const sanitizedHeading = (currentHeading || "All India Marks Analysis").replace(/[^a-zA-Z0-9\-_ ]/g, '_').trim();
+            const fullPattern = `${testDate}_${stream}_${testName}_${sanitizedHeading}`;
             const progName = studentMarks[0]?.batch || stream;
 
             // Update Metadata Rows 5, 6, 7

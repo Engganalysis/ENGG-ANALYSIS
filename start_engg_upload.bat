@@ -1,6 +1,9 @@
 @echo off
 title ENGG Analysis Result Uploader
 
+:: Custom Heading configuration for PDFs and saved files
+set CUSTOM_HEADING=Sri Chaitanya Educational Institutions
+
 :: Change to the current project directory using relative path
 cd /d "%~dp0"
 

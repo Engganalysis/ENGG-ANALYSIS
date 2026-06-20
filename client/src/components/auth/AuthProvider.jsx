@@ -57,18 +57,20 @@ export const AuthProvider = ({ children }) => {
     const [customHeading, setCustomHeading] = useState('');
     const [fileNamesHeading, setFileNamesHeading] = useState('');
 
-    // Fetch custom heading in real-time from Firestore
+    // Fetch custom heading from API
     useEffect(() => {
-        const unsub = onSnapshot(doc(db, "settings", "heading"), (docSnap) => {
-            if (docSnap.exists()) {
-                setCustomHeading(docSnap.data().customHeading || '');
-            } else {
-                setCustomHeading('');
+        const fetchCustomHeading = async () => {
+            try {
+                const res = await fetch(`${API_URL}/api/settings/heading`);
+                if (res.ok) {
+                    const data = await res.json();
+                    setCustomHeading(data.customHeading || '');
+                }
+            } catch (err) {
+                console.error("Error fetching custom heading:", err);
             }
-        }, (err) => {
-            console.error("Error fetching custom heading:", err);
-        });
-        return unsub;
+        };
+        fetchCustomHeading();
     }, []);
 
     // Fetch filename heading from API
