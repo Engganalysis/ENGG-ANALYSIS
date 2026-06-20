@@ -795,12 +795,19 @@ const AnalysisReport = ({ filters }) => {
                         // Create a shallow copy of style to safely change the fill per row
                         const cellStyle = { ...style };
                         
-                        // Set alternating background fills: even rows white, odd rows soft light blue
-                        cellStyle.fill = {
-                            type: 'pattern',
-                            pattern: 'solid',
-                            fgColor: { argb: isEven ? 'FFFFFFFF' : 'FFEBF2FA' }
-                        };
+                        // Set alternating background fills for alternating columns to match the template's light green/cyan
+                        const isAlternatingCol = [1, 2, 3, 5, 6, 8, 9, 11, 12, 14, 15].includes(col.colNumber);
+                        if (isAlternatingCol) {
+                            cellStyle.fill = {
+                                type: 'pattern',
+                                pattern: 'solid',
+                                fgColor: { argb: isEven ? 'FFE1F6F7' : 'FFFFFFFF' }
+                            };
+                        } else {
+                            if (style.fill) {
+                                cellStyle.fill = style.fill;
+                            }
+                        }
                         
                         newRow.getCell(col.colNumber).style = cellStyle;
                     }
