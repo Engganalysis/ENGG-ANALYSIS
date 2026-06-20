@@ -1,5 +1,8 @@
-=== UPLOADER LOG: 6/19/2026, 3:45:14 PM ===
+=== UPLOADER LOG: 6/20/2026, 12:41:25 PM ===
 
+FILE: BEN_PU COLLEGE ELECTRONIC CITY DS.xlsx
+MISSING COLUMNS: P1_P2, BEST3, B1000, JMAINS
+-----------------------------------
 FILE: BEN_PU COLLEGE NAGARBHAVI.xlsx
 MISSING COLUMNS: P1_P2, BEST3, B1000, JMAINS
 -----------------------------------
@@ -7,5 +10,8 @@ FILE: BEN_PU COLLEGE SARJAPURA.xlsx
 MISSING COLUMNS: P1_P2, BEST3, B1000, JMAINS
 -----------------------------------
 FILE: BEN_PU COLLEGE VIDYARANYAPURA.xlsx
+MISSING COLUMNS: P1_P2, BEST3, B1000, JMAINS
+-----------------------------------
+FILE: TUM_PU COLLEGE TUMKUR.xlsx
 MISSING COLUMNS: P1_P2, BEST3, B1000, JMAINS
 -----------------------------------
