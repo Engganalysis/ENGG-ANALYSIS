@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const XLSX = require('xlsx');
 const pdfParse = require('pdf-parse');
+const readlineSync = require('readline-sync');
 const { connectToDb } = require('./db');
 
 // --- Configuration ---
@@ -49,6 +50,14 @@ async function processErp() {
 
         pool = await connectToDb();
         console.log("Connected to TiDB (ERP Extraction)");
+
+        // Ensure Custom_Heading column exists in ERP_REPORT_ENGG
+        try {
+            await pool.request().query("ALTER TABLE ERP_REPORT_ENGG ADD COLUMN Custom_Heading TEXT");
+            console.log("[DB] Ensured Custom_Heading column exists in ERP_REPORT_ENGG.");
+        } catch (err) {
+            // Safely ignore if column already exists
+        }
 
         // 1. Load Uploader Config (Top IDs and All IDs Mapping)
         let topIds = new Set();
@@ -121,6 +130,18 @@ async function processErp() {
 
             const { testInfo } = marksData;
             console.log(`Test: ${testInfo.test}, Date: ${testInfo.date}, Batch: ${testInfo.batch}`);
+
+            console.log("\n--------------------------------------------------");
+            const defaultHeading = `${testInfo.date}_${testInfo.batch}_${testInfo.test}_Error Analysis`;
+            console.log(`Default Heading: ${defaultHeading}`);
+            const customHeading = readlineSync.question("Enter custom heading for this test (or press Enter to keep default): ").trim();
+            testInfo.customHeading = customHeading || '';
+            if (customHeading) {
+                console.log(`Using Custom Heading: "${customHeading}"`);
+            } else {
+                console.log("Using Default Heading.");
+            }
+            console.log("--------------------------------------------------\n");
 
             // NEW: Check if this file itself contains the STUD_ERQ sheets (Macro Mode)
             const wb = XLSX.readFile(fullMarksPath);
@@ -518,6 +539,7 @@ async function processPaper(pool, label, qErrorPath, marksData, topIds, generalI
                     Student_Name: studentMarks.Student_Name,
                     Branch: normalizeCampus(studentMarks.Branch), // Normalized campus
                     Batch: testInfo.batch,
+                    Custom_Heading: testInfo.customHeading || '',
                     Exam_Date: dbDate,
                     Test_Type: specificTest.split('-')[0],
                     Test: specificTest,
@@ -726,7 +748,7 @@ async function uploadErpRows(pool, rows, mode) {
                 STUD_ID, Student_Name, Branch, Batch, Exam_Date, Test_Type, Test, TOT, TOT_P, AIR,
                 MAT, MAT_R, MAT_P, PHY, PHY_R, PHY_P, CHE, CHE_R, CHE_P,
                 Q_No, W_U, Q_URL, S_URL, Key_Value, Subject, Topic, Sub_Topics,
-                Question_Type, Sources, Original_Replica, Level, Year, Top_ALL, P1_P2
+                Question_Type, Sources, Original_Replica, Level, Year, Top_ALL, P1_P2, Custom_Heading
             )
             SELECT 
                 ${r.STUD_ID}, '${esc(r.Student_Name)}', '${esc(r.Branch)}', '${esc(r.Batch)}', '${r.Exam_Date}',
@@ -737,7 +759,7 @@ async function uploadErpRows(pool, rows, mode) {
                 ${r.Q_No}, '${esc(r.W_U)}', '${r.Q_URL}', '${r.S_URL}',
                 '${esc(r.Key_Value)}', '${esc(r.Subject)}', '${esc(r.Topic)}', '${esc(r.Sub_Topics)}',
                 '${esc(r.Question_Type)}', '${esc(r.Sources)}', '${esc(r.Original_Replica)}', '${esc(r.Level)}',
-                '${r.Year}', '${r.Top_ALL}', '${r.P1_P2}'
+                '${r.Year}', '${r.Top_ALL}', '${r.P1_P2}', '${esc(r.Custom_Heading || '')}'
             FROM (SELECT 1 as dummy) AS t
             WHERE NOT EXISTS (
                 SELECT 1 FROM ERP_REPORT_ENGG 

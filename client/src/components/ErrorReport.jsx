@@ -89,7 +89,8 @@ const ErrorReport = ({ filters, setFilters }) => {
                             phy: row.PHY,
                             p_rank: row.PHY_R,
                             chem: row.CHE,
-                            c_rank: row.CHE_R
+                            c_rank: row.CHE_R,
+                            customHeading: row.Custom_Heading
                         },
                         questions: []
                     };
@@ -348,7 +349,7 @@ const ErrorReport = ({ filters, setFilters }) => {
             doc.setTextColor(0);
             if (bookmanBoldFont) doc.setFont("Bookman", "bold");
             else doc.setFont("helvetica", "bold");
-            const testTitle = `${formatDate(test.meta.date)}_${student.info.stream}_${test.meta.testName}_Error Analysis`;
+            const testTitle = test.meta.customHeading || `${formatDate(test.meta.date)}_${student.info.stream}_${test.meta.testName}_Error Analysis`;
             doc.text(testTitle, pageWidth / 2, yPos + 6, { align: 'center' });
             yPos += 12;
 
@@ -887,7 +888,7 @@ const ErrorReport = ({ filters, setFilters }) => {
                             return (
                                 <div key={tIdx} style={{ marginBottom: '30px' }}>
                                     <h2 style={{ textAlign: 'center', color: '#000', fontSize: '18px', fontWeight: 'bold', marginBottom: '15px' }}>
-                                        {formatDate(test.meta.date)}_{student.info.stream}_{test.meta.testName}_Error Analysis
+                                        {test.meta.customHeading || `${formatDate(test.meta.date)}_${student.info.stream}_${test.meta.testName}_Error Analysis`}
                                     </h2>
                                     {/* Score Table */}
                                     <div style={{ overflowX: 'auto' }}>

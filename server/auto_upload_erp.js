@@ -100,7 +100,8 @@ async function processFile(filePath) {
                         Level TEXT,
                         Year TEXT,
                         Top_ALL TEXT,
-                        P1_P2 TEXT
+                        P1_P2 TEXT,
+                        Custom_Heading TEXT
                     ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
                 `;
                 await pool.request().query(createTableSql);
