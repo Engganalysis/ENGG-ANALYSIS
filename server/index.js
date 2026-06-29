@@ -297,7 +297,13 @@ app.get('/api/filters', async (req, res) => {
         const testTypeClause = buildOptionClause('UPPER(TRIM(P1_P2))', testType);
         const testClause = buildOptionClause('UPPER(TRIM(Test))', test);
 
-        const campusesQuery = 'SELECT DISTINCT TRIM(CAMPUS_NAME) as Result FROM ENGG_RESULT WHERE CAMPUS_NAME IS NOT NULL AND CAMPUS_NAME != \'\' ORDER BY Result';
+        const campusesQuery = `
+            SELECT DISTINCT Result FROM (
+                SELECT DISTINCT TRIM(CAMPUS_NAME) as Result FROM ENGG_RESULT WHERE CAMPUS_NAME IS NOT NULL AND CAMPUS_NAME != ''
+                UNION
+                SELECT DISTINCT TRIM(Branch) as Result FROM ERP_REPORT_ENGG WHERE Branch IS NOT NULL AND Branch != ''
+            ) as combined ORDER BY Result
+        `;
 
         const sWhere = campusClause ? `WHERE ${campusClause}` : 'WHERE 1=1';
         const streamsQuery = `SELECT DISTINCT TRIM(Batch) as Result FROM ENGG_RESULT ${sWhere} AND Batch IS NOT NULL AND Batch != '' ORDER BY Result`;

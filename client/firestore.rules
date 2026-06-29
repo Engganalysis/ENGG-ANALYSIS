@@ -1,0 +1,53 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if the user is an admin
+    function isAdmin() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Users Collection Rules
+    match /users/{userId} {
+      // Allow read if user is authenticated and reading their own document, or is admin
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      
+      // Allow create if user is authenticated and creating their own document
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Allow update if user is authenticated and updating their own document, or is admin
+      allow update: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      
+      // Allow delete only for admins
+      allow delete: if isAdmin();
+    }
+    
+    // Activity Logs Collection Rules
+    match /activity_logs/{logId} {
+      // Allow read only for admins
+      allow read: if isAdmin();
+      
+      // Allow create for any authenticated user
+      allow create: if isAuthenticated();
+      
+      // Deny update and delete
+      allow update, delete: if false;
+    }
+    
+    // Settings Collection Rules
+    match /settings/{settingId} {
+      // Allow read for authenticated users
+      allow read: if isAuthenticated();
+      
+      // Allow write only for admins
+      allow write: if isAdmin();
+    }
+  }
+}

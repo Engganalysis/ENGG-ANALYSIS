@@ -24,6 +24,30 @@ export const AuthProvider = ({ children }) => {
                     if (user.email === "yenjarappa.s@varsitymgmt.com") {
                         setUserData({ role: 'admin', campus: 'All', isApproved: true, email: user.email });
                         setLoading(false);
+                        
+                        // Asynchronously ensure admin document exists in Firestore with role: 'admin'
+                        // so that Firestore security rules will allow admin operations (like approving users).
+                        (async () => {
+                            try {
+                                const adminDocRef = doc(db, "users", user.uid);
+                                const adminDoc = await getDoc(adminDocRef);
+                                if (!adminDoc.exists() || adminDoc.data().role !== 'admin' || !adminDoc.data().isApproved) {
+                                    console.log("Admin document missing or invalid in Firestore. Creating/updating it...");
+                                    await setDoc(adminDocRef, {
+                                        uid: user.uid,
+                                        name: "Administrator",
+                                        email: user.email,
+                                        role: 'admin',
+                                        isApproved: true,
+                                        campus: 'All',
+                                        createdAt: adminDoc.exists() ? (adminDoc.data().createdAt || new Date().toISOString()) : new Date().toISOString()
+                                    }, { merge: true });
+                                    console.log("Admin document successfully created/updated in Firestore.");
+                                }
+                            } catch (err) {
+                                console.error("Error ensuring admin document in Firestore:", err);
+                            }
+                        })();
                         return;
                     }
 
