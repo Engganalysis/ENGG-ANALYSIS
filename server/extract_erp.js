@@ -131,18 +131,6 @@ async function processErp() {
             const { testInfo } = marksData;
             console.log(`Test: ${testInfo.test}, Date: ${testInfo.date}, Batch: ${testInfo.batch}`);
 
-            console.log("\n--------------------------------------------------");
-            const defaultHeading = `${testInfo.date}_${testInfo.batch}_${testInfo.test}_Error Analysis`;
-            console.log(`Default Heading: ${defaultHeading}`);
-            const customHeading = readlineSync.question("Enter custom heading for this test (or press Enter to keep default): ").trim();
-            testInfo.customHeading = customHeading || '';
-            if (customHeading) {
-                console.log(`Using Custom Heading: "${customHeading}"`);
-            } else {
-                console.log("Using Default Heading.");
-            }
-            console.log("--------------------------------------------------\n");
-
             // NEW: Check if this file itself contains the STUD_ERQ sheets (Macro Mode)
             const wb = XLSX.readFile(fullMarksPath);
             const sheetNames = wb.SheetNames.map(n => n.toUpperCase());
@@ -360,6 +348,25 @@ async function processPaper(pool, label, qErrorPath, marksData, topIds, generalI
 
     const { testInfo } = marksData;
 
+    const paperName = label === 'P1' ? 'Paper 1' : 'Paper 2';
+    let specificTestName = testInfo.test;
+    if (testInfo.test.includes('&')) {
+        const testParts = testInfo.test.split('&').map(t => t.trim());
+        if (label === 'P1') specificTestName = testParts[0];
+        else if (label === 'P2') specificTestName = testParts[1] || testParts[0];
+    }
+    console.log("\n--------------------------------------------------");
+    const defaultHeading = `${testInfo.date}_${testInfo.batch}_${specificTestName}_Error Analysis`;
+    console.log(`Default Heading for ${paperName}: ${defaultHeading}`);
+    const customHeading = readlineSync.question(`Enter custom heading for ${paperName} (or press Enter to keep default): `).trim();
+    const paperCustomHeading = customHeading || '';
+    if (paperCustomHeading) {
+        console.log(`Using Custom Heading for ${paperName}: "${paperCustomHeading}"`);
+    } else {
+        console.log(`Using Default Heading for ${paperName}.`);
+    }
+    console.log("--------------------------------------------------\n");
+
     // Choose the correct sheet: 
     // Case 1: Internal sheets like STUD_ERQ_P1 / STUD_ERQ_P2
     // Case 2: Standard 'STUD_ERQ'
@@ -539,7 +546,7 @@ async function processPaper(pool, label, qErrorPath, marksData, topIds, generalI
                     Student_Name: studentMarks.Student_Name,
                     Branch: normalizeCampus(studentMarks.Branch), // Normalized campus
                     Batch: testInfo.batch,
-                    Custom_Heading: testInfo.customHeading || '',
+                    Custom_Heading: paperCustomHeading,
                     Exam_Date: dbDate,
                     Test_Type: specificTest.split('-')[0],
                     Test: specificTest,
