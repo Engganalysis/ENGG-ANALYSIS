@@ -285,6 +285,16 @@ function parseMarksFile(filePath) {
     return { marks: marksMap, testInfo: parseFilenameInfo(filePath, rowHeader) };
 }
 
+function getBatchFolderName(base) {
+    const picsDir = path.join(base, 'PICS');
+    if (!fs.existsSync(picsDir)) return null;
+    const subs = fs.readdirSync(picsDir).filter(f => {
+        const fullPath = path.join(picsDir, f);
+        return fs.statSync(fullPath).isDirectory() && f !== 'P1' && f !== 'P2';
+    });
+    return subs[0] || null; // Return the first batch directory found
+}
+
 function parseFilenameInfo(filePath, sourceText) {
     const filename = path.basename(filePath);
     // Prioritize text from Excel Row 3 if available, otherwise use filename
@@ -312,8 +322,10 @@ function parseFilenameInfo(filePath, sourceText) {
     const isMains = text.toUpperCase().includes('MAIN');
     const typeLabel = isAdv ? 'Adv' : (isMains ? 'Mains' : '');
 
-    // The user wants Jr.Super-60(N_Adv)
-    const batch = `${prefix}(${firstLetter}${typeLabel ? '_' + typeLabel : ''})`;
+    // Let's get the actual folder name from PICS if available
+    const baseDir = path.dirname(filePath);
+    const folderBatch = getBatchFolderName(baseDir);
+    const batch = folderBatch || `${prefix}(${firstLetter}${typeLabel ? '_' + typeLabel : ''})`;
 
     return { date: dateStr, batch, test: testPart, testType, batchRaw: prefix, firstLetter };
 }

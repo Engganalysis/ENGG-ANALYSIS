@@ -77,6 +77,11 @@ function normalizeBatchName(name) {
     if (!name) return '';
     const clean = name.trim();
     
+    // If the name is a custom name (e.g. contains underscores or 'nucleus'), preserve it as-is
+    if (clean.includes('_') || clean.toLowerCase().includes('nucleus')) {
+        return clean;
+    }
+    
     // 1. Identify Prefix: "Jr." or "Sr."
     let prefix = '';
     if (/^jr/i.test(clean)) {
