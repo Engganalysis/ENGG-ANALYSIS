@@ -29,9 +29,16 @@ async function uploadToImgBB() {
         const wb = XLSX.readFile(path.join(ERP_BASE, marksFile));
         const ws = wb.Sheets[wb.SheetNames[0]];
         const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
-        if (data[3] && data[3][0]) {
-            sourceText = data[3][0];
-            console.log(`[DEBUG] Found batch info in Excel Row 3: ${sourceText}`);
+        let headerRowIdx = -1;
+        for (let i = 0; i < 20; i++) {
+            if (data[i] && data[i].some(c => String(c || '').trim().toUpperCase() === 'TOT')) {
+                headerRowIdx = i;
+                break;
+            }
+        }
+        if (headerRowIdx > 0 && data[headerRowIdx - 1] && data[headerRowIdx - 1][0]) {
+            sourceText = data[headerRowIdx - 1][0];
+            console.log(`[DEBUG] Found batch info in Excel Row: ${sourceText}`);
         }
     } catch (e) {
         console.warn("[WARN] Could not read Row 3 from Excel, falling back to filename.");

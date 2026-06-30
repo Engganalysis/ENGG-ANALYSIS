@@ -92,13 +92,18 @@ const ActivityLogs = () => {
         setModal(prev => ({ ...prev, loading: true }));
         try {
             const querySnapshot = await getDocs(collection(db, "activity_logs"));
-            const batch = writeBatch(db);
+            const docs = querySnapshot.docs;
+            
+            const chunkSize = 500;
+            for (let i = 0; i < docs.length; i += chunkSize) {
+                const chunk = docs.slice(i, i + chunkSize);
+                const batch = writeBatch(db);
+                chunk.forEach((d) => {
+                    batch.delete(doc(db, "activity_logs", d.id));
+                });
+                await batch.commit();
+            }
 
-            querySnapshot.docs.forEach((d) => {
-                batch.delete(doc(db, "activity_logs", d.id));
-            });
-
-            await batch.commit();
             setActivityLogs([]);
 
             setModal({

@@ -290,7 +290,7 @@ function parseMarksFile(filePath) {
         }
     }
 
-    const rowHeader = (data[3] && data[3][0]) ? String(data[3][0]) : "";
+    const rowHeader = (headerRowIdx > 0 && data[headerRowIdx - 1] && data[headerRowIdx - 1][0]) ? String(data[headerRowIdx - 1][0]) : "";
     return { marks: marksMap, testInfo: parseFilenameInfo(filePath, rowHeader) };
 }
 
@@ -358,12 +358,31 @@ async function processPaper(pool, label, qErrorPath, marksData, topIds, generalI
     console.log("\n--------------------------------------------------");
     const defaultHeading = `${testInfo.date}_${testInfo.batch}_${specificTestName}_Error Analysis`;
     console.log(`Default Heading for ${paperName}: ${defaultHeading}`);
-    const customHeading = readlineSync.question(`Enter custom heading for ${paperName} (or press Enter to keep default): `).trim();
+    let customHeading = '';
+    if (process.stdin.isTTY) {
+        try {
+            customHeading = readlineSync.question(`Enter custom heading for ${paperName} (or press Enter to keep default): `).trim();
+        } catch (e) {}
+    }
     const paperCustomHeading = customHeading || '';
     if (paperCustomHeading) {
         console.log(`Using Custom Heading for ${paperName}: "${paperCustomHeading}"`);
     } else {
         console.log(`Using Default Heading for ${paperName}.`);
+    }
+
+    const defaultTestType = specificTestName.split('-')[0];
+    let customTestType = '';
+    if (process.stdin.isTTY) {
+        try {
+            customTestType = readlineSync.question(`Enter Test Type for ${paperName} (or press Enter to keep default ${defaultTestType}): `).trim();
+        } catch (e) {}
+    }
+    const paperTestType = customTestType || '';
+    if (paperTestType) {
+        console.log(`Using Custom Test Type for ${paperName}: "${paperTestType}"`);
+    } else {
+        console.log(`Using Default Test Type for ${paperName}: "${defaultTestType}"`);
     }
     console.log("--------------------------------------------------\n");
 
@@ -404,7 +423,7 @@ async function processPaper(pool, label, qErrorPath, marksData, topIds, generalI
     const metaCount = Object.keys(metaData.meta).length;
     const isIncomplete = metaCount > 0 && metaCount < 5 && qCols.length > 10;
 
-    if (!manualMapping && (metaCount === 0 || isIncomplete)) {
+    if (!manualMapping && metaCount > 0 && isIncomplete && process.stdin.isTTY) {
         const totalQs = qCols.length;
         const perSub = Math.floor(totalQs / 3);
 
@@ -532,13 +551,15 @@ async function processPaper(pool, label, qErrorPath, marksData, topIds, generalI
 
                 const qInt = parseInt(qNo);
                 let fallbackSubject = '--';
-                if (manualMapping && manualMapping[qInt]) {
-                    fallbackSubject = manualMapping[qInt];
-                } else {
-                    const qsPerSub = qCols.length / 3;
-                    if (qInt <= qsPerSub) fallbackSubject = 'MATHS';
-                    else if (qInt <= qsPerSub * 2) fallbackSubject = 'PHYSICS';
-                    else fallbackSubject = 'CHEMISTRY';
+                if (metaCount > 0) {
+                    if (manualMapping && manualMapping[qInt]) {
+                        fallbackSubject = manualMapping[qInt];
+                    } else {
+                        const qsPerSub = qCols.length / 3;
+                        if (qInt <= qsPerSub) fallbackSubject = 'MATHS';
+                        else if (qInt <= qsPerSub * 2) fallbackSubject = 'PHYSICS';
+                        else fallbackSubject = 'CHEMISTRY';
+                    }
                 }
 
                 rowsToUpload.push({
@@ -548,7 +569,7 @@ async function processPaper(pool, label, qErrorPath, marksData, topIds, generalI
                     Batch: testInfo.batch,
                     Custom_Heading: paperCustomHeading,
                     Exam_Date: dbDate,
-                    Test_Type: specificTest.split('-')[0],
+                    Test_Type: paperTestType || specificTest.split('-')[0],
                     Test: specificTest,
                     TOT: studentMarks.TOT,
                     TOT_P: studentMarks.TOT_P,
@@ -735,49 +756,73 @@ function loadKeys(filePath) {
 }
 
 async function uploadErpRows(pool, rows, mode) {
+    if (!rows || rows.length === 0) return;
     const info = rows[0];
     console.log(`  Cleaning and Uploading ${rows.length} records for ${info.Test} (${info.P1_P2}) Mode: ${mode}...`);
 
-    // User requested NOT to delete from TiDB. 
-    // Warning: Running this multiple times for the same test/campus will create duplicate rows.
-    /*
-    let deleteSql = `DELETE FROM ERP_REPORT_ENGG WHERE Test='${esc(info.Test)}' AND Exam_Date='${info.Exam_Date}' AND P1_P2='${info.P1_P2}' AND Branch='${esc(info.Branch)}'`;
-    if (mode === 'TOP') deleteSql += " AND Top_ALL = 'TOP'";
-    else if (mode === 'ALL') deleteSql += " AND Top_ALL = 'ALL'";
- 
-    await pool.request().query(deleteSql);
-    */
-    console.log(`  [INFO] Safe-Inserting ${rows.length} records (Skipping duplicates)...`);
+    // 1. Fetch existing combinations of (STUD_ID, Q_No) for this test paper mode to skip duplicates locally
+    const existingSql = `
+        SELECT STUD_ID, Q_No 
+        FROM ERP_REPORT_ENGG 
+        WHERE Test = '${esc(info.Test)}' 
+          AND Exam_Date = '${info.Exam_Date}' 
+          AND P1_P2 = '${info.P1_P2}'
+          AND Top_ALL = '${info.Top_ALL}'
+    `;
+    const res = await pool.request().query(existingSql);
+    const existingSet = new Set();
+    if (res && res.recordset) {
+        for (const row of res.recordset) {
+            existingSet.add(`${row.STUD_ID}_${row.Q_No}`);
+        }
+    }
+    console.log(`  [INFO] Found ${existingSet.size} existing records in DB. Filtering duplicates...`);
 
-    for (const r of rows) {
+    const filteredRows = rows.filter(r => !existingSet.has(`${r.STUD_ID}_${r.Q_No}`));
+
+    const uniqueFiltered = [];
+    const seenThisRun = new Set();
+    for (const r of filteredRows) {
+        const key = `${r.STUD_ID}_${r.Q_No}`;
+        if (!seenThisRun.has(key)) {
+            seenThisRun.add(key);
+            uniqueFiltered.push(r);
+        }
+    }
+
+    if (uniqueFiltered.length === 0) {
+        console.log("  [INFO] All records already exist in DB. Nothing to upload.");
+        return;
+    }
+
+    console.log(`  [INFO] Safe-Inserting ${uniqueFiltered.length} records in batches...`);
+
+    const batchSize = 500;
+    for (let i = 0; i < uniqueFiltered.length; i += batchSize) {
+        const batch = uniqueFiltered.slice(i, i + batchSize);
+        console.log(`    [INFO] Uploading batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(uniqueFiltered.length / batchSize)} (${batch.length} records)...`);
+        
+        const valueStrings = batch.map(r => `(
+            ${r.STUD_ID}, '${esc(r.Student_Name)}', '${esc(r.Branch)}', '${esc(r.Batch)}', '${r.Exam_Date}',
+            '${esc(r.Test_Type)}', '${esc(r.Test)}', '${esc(r.TOT)}', '${esc(r.TOT_P)}', '${esc(r.AIR)}',
+            '${esc(r.MAT)}', '${esc(r.MAT_R)}', '${esc(r.MAT_P)}',
+            '${esc(r.PHY)}', '${esc(r.PHY_R)}', '${esc(r.PHY_P)}',
+            '${esc(r.CHE)}', '${esc(r.CHE_R)}', '${esc(r.CHE_P)}',
+            ${r.Q_No}, '${esc(r.W_U)}', '${r.Q_URL}', '${r.S_URL}',
+            '${esc(r.Key_Value)}', '${esc(r.Subject)}', '${esc(r.Topic)}', '${esc(r.Sub_Topics)}',
+            '${esc(r.Question_Type)}', '${esc(r.Sources)}', '${esc(r.Original_Replica)}', '${esc(r.Level)}',
+            '${r.Year}', '${r.Top_ALL}', '${r.P1_P2}', '${esc(r.Custom_Heading || '')}'
+        )`).join(',\n');
+
         const sql = `
             INSERT INTO ERP_REPORT_ENGG (
                 STUD_ID, Student_Name, Branch, Batch, Exam_Date, Test_Type, Test, TOT, TOT_P, AIR,
                 MAT, MAT_R, MAT_P, PHY, PHY_R, PHY_P, CHE, CHE_R, CHE_P,
                 Q_No, W_U, Q_URL, S_URL, Key_Value, Subject, Topic, Sub_Topics,
                 Question_Type, Sources, Original_Replica, Level, Year, Top_ALL, P1_P2, Custom_Heading
-            )
-            SELECT 
-                ${r.STUD_ID}, '${esc(r.Student_Name)}', '${esc(r.Branch)}', '${esc(r.Batch)}', '${r.Exam_Date}',
-                '${esc(r.Test_Type)}', '${esc(r.Test)}', '${esc(r.TOT)}', '${esc(r.TOT_P)}', '${esc(r.AIR)}',
-                '${esc(r.MAT)}', '${esc(r.MAT_R)}', '${esc(r.MAT_P)}',
-                '${esc(r.PHY)}', '${esc(r.PHY_R)}', '${esc(r.PHY_P)}',
-                '${esc(r.CHE)}', '${esc(r.CHE_R)}', '${esc(r.CHE_P)}',
-                ${r.Q_No}, '${esc(r.W_U)}', '${r.Q_URL}', '${r.S_URL}',
-                '${esc(r.Key_Value)}', '${esc(r.Subject)}', '${esc(r.Topic)}', '${esc(r.Sub_Topics)}',
-                '${esc(r.Question_Type)}', '${esc(r.Sources)}', '${esc(r.Original_Replica)}', '${esc(r.Level)}',
-                '${r.Year}', '${r.Top_ALL}', '${r.P1_P2}', '${esc(r.Custom_Heading || '')}'
-            FROM (SELECT 1 as dummy) AS t
-            WHERE NOT EXISTS (
-                SELECT 1 FROM ERP_REPORT_ENGG 
-                WHERE STUD_ID = ${r.STUD_ID} 
-                  AND Test = '${esc(r.Test)}' 
-                  AND Exam_Date = '${r.Exam_Date}' 
-                  AND Q_No = ${r.Q_No}
-                  AND P1_P2 = '${r.P1_P2}'
-                  AND Top_ALL = '${r.Top_ALL}'
-            )
+            ) VALUES ${valueStrings}
         `;
+        
         await pool.request().query(sql);
     }
 }
