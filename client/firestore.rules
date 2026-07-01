@@ -37,8 +37,11 @@ service cloud.firestore {
       // Allow create for any authenticated user
       allow create: if isAuthenticated();
       
-      // Deny update and delete
-      allow update, delete: if false;
+      // Allow delete only for admins
+      allow delete: if isAdmin();
+      
+      // Deny update
+      allow update: if false;
     }
     
     // Settings Collection Rules

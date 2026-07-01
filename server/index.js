@@ -136,8 +136,8 @@ let lastCacheUpdate = 0;
 
 async function getRawBatches(pool) {
     const now = Date.now();
-    // Cache for 5 minutes
-    if (allRawBatchesCache.length > 0 && (now - lastCacheUpdate < 300000)) {
+    // Cache for 5 seconds
+    if (allRawBatchesCache.length > 0 && (now - lastCacheUpdate < 5000)) {
         return allRawBatchesCache;
     }
     try {

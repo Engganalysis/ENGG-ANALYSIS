@@ -21,7 +21,7 @@ echo === [3/4] Building and Deploying Frontend to Firebase ===
 cd client
 :: Use 'call' so the script doesn't exit after npm/firebase
 call npm run build
-call firebase deploy --only hosting
+call firebase deploy --only hosting,firestore:rules
 cd ..
 
 echo.

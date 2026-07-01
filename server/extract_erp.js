@@ -760,6 +760,22 @@ async function uploadErpRows(pool, rows, mode) {
     const info = rows[0];
     console.log(`  Cleaning and Uploading ${rows.length} records for ${info.Test} (${info.P1_P2}) Mode: ${mode}...`);
 
+    // 0. Update Test_Type and Custom_Heading for any existing records of this test/date/paper/mode/branch
+    const uniqueBranches = Array.from(new Set(rows.map(r => r.Branch)));
+    for (const br of uniqueBranches) {
+        const updateSql = `
+            UPDATE ERP_REPORT_ENGG 
+            SET Test_Type = '${esc(info.Test_Type)}',
+                Custom_Heading = '${esc(info.Custom_Heading)}'
+            WHERE Test = '${esc(info.Test)}'
+              AND Exam_Date = '${info.Exam_Date}'
+              AND P1_P2 = '${info.P1_P2}'
+              AND Branch = '${esc(br)}'
+              AND Top_ALL = '${info.Top_ALL}'
+        `;
+        await pool.request().query(updateSql);
+    }
+
     // 1. Fetch existing combinations of (STUD_ID, Q_No) for this test paper mode to skip duplicates locally
     const existingSql = `
         SELECT STUD_ID, Q_No 
